@@ -98,6 +98,10 @@ tests/            -- Test harnesses (trigger, content, mocked review, fixtures)
 docs/             -- Documentation and development plan
 ```
 
+## Reference
++ https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep
++ https://github.com/obra/superpowers
+
 ## License
 
 See [LICENSE](LICENSE) for details.
