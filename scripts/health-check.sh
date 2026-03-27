@@ -1,17 +1,19 @@
 #!/bin/bash
 # health-check.sh -- Generic health check runner for cccx-monitor
-# Usage: bash health-check.sh <url> [options]
+# Usage: bash health-check.sh [url] [options]
 #
 # Options:
+#   --method METHOD      HTTP method (default: GET)
 #   --timeout SECONDS    Request timeout (default: 10)
 #   --expected-status N  Expected HTTP status code (default: 200)
-#   --expected-body STR  Expected substring in response body
+#   --expected-body STR  Expected substring in response body (literal match)
 #   --process NAME       Check if a process with this name is running
 #   --quiet              Only output PASS/FAIL, no details
 
 set -euo pipefail
 
-URL="${1:-}"
+URL=""
+METHOD="GET"
 TIMEOUT=10
 EXPECTED_STATUS=200
 EXPECTED_BODY=""
@@ -19,61 +21,58 @@ PROCESS_NAME=""
 QUIET=false
 
 usage() {
-    echo "Usage: bash health-check.sh <url> [options]"
+    echo "Usage: bash health-check.sh [url] [options]"
     echo ""
     echo "Options:"
+    echo "  --method METHOD      HTTP method (default: GET)"
     echo "  --timeout SECONDS    Request timeout (default: 10)"
     echo "  --expected-status N  Expected HTTP status (default: 200)"
     echo "  --expected-body STR  Expected substring in response body"
     echo "  --process NAME       Check if named process is running"
     echo "  --quiet              Only output PASS/FAIL"
+    echo ""
+    echo "At least one of url or --process must be provided."
     exit 1
 }
 
-if [ -z "$URL" ] && [ -z "$PROCESS_NAME" ]; then
-    # Check if only --process was provided
-    shift 0 2>/dev/null || true
-    for arg in "$@"; do
-        if [ "$arg" = "--process" ]; then
-            break
-        fi
-    done
-    if [ -z "$PROCESS_NAME" ] && [ "$#" -eq 0 ]; then
-        usage
-    fi
-fi
-
-shift 2>/dev/null || true
-
+# Parse all arguments in a single loop (no eager positional capture)
 while [ $# -gt 0 ]; do
     case "$1" in
+        --method) METHOD="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --expected-status) EXPECTED_STATUS="$2"; shift 2 ;;
         --expected-body) EXPECTED_BODY="$2"; shift 2 ;;
         --process) PROCESS_NAME="$2"; shift 2 ;;
         --quiet) QUIET=true; shift ;;
-        *) shift ;;
+        --help|-h) usage ;;
+        --*) echo "Unknown option: $1"; usage ;;
+        *) URL="$1"; shift ;;
     esac
 done
+
+if [ -z "$URL" ] && [ -z "$PROCESS_NAME" ]; then
+    usage
+fi
 
 PASS=true
 DETAILS=""
 
 # HTTP health check
 if [ -n "$URL" ]; then
-    HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "$URL" 2>/dev/null) || HTTP_RESPONSE="000"
+    CURL_METHOD=$(echo "$METHOD" | tr '[:lower:]' '[:upper:]')
+    HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X "$CURL_METHOD" --max-time "$TIMEOUT" "$URL" 2>/dev/null) || HTTP_RESPONSE="000"
 
     if [ "$HTTP_RESPONSE" = "$EXPECTED_STATUS" ]; then
-        DETAILS="${DETAILS}HTTP: PASS (${URL} returned ${HTTP_RESPONSE})\n"
+        DETAILS="${DETAILS}HTTP: PASS (${CURL_METHOD} ${URL} returned ${HTTP_RESPONSE})\n"
     else
-        DETAILS="${DETAILS}HTTP: FAIL (${URL} returned ${HTTP_RESPONSE}, expected ${EXPECTED_STATUS})\n"
+        DETAILS="${DETAILS}HTTP: FAIL (${CURL_METHOD} ${URL} returned ${HTTP_RESPONSE}, expected ${EXPECTED_STATUS})\n"
         PASS=false
     fi
 
-    # Body check
+    # Body check -- uses grep -F for literal (fixed-string) matching
     if [ -n "$EXPECTED_BODY" ]; then
-        BODY=$(curl -s --max-time "$TIMEOUT" "$URL" 2>/dev/null) || BODY=""
-        if echo "$BODY" | grep -q "$EXPECTED_BODY"; then
+        BODY=$(curl -s -X "$CURL_METHOD" --max-time "$TIMEOUT" "$URL" 2>/dev/null) || BODY=""
+        if echo "$BODY" | grep -qF "$EXPECTED_BODY"; then
             DETAILS="${DETAILS}BODY: PASS (contains '${EXPECTED_BODY}')\n"
         else
             DETAILS="${DETAILS}BODY: FAIL (does not contain '${EXPECTED_BODY}')\n"

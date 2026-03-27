@@ -70,6 +70,20 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# Derive default subject from artifact path if not provided
+if [ -z "$SUBJECT" ]; then
+    for candidate in "$DESIGN_DOC" "$PLAN_DOC" "$SERVICE_PROFILE" "$DEPLOY_PLAN"; do
+        if [ -n "$candidate" ]; then
+            SUBJECT="$(basename "$candidate")"
+            break
+        fi
+    done
+fi
+# Final fallback
+if [ -z "$SUBJECT" ]; then
+    SUBJECT="$PROFILE review"
+fi
+
 write_header() {
     {
         echo "---"

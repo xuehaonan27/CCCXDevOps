@@ -93,9 +93,14 @@ This will delete:
 
 Type 'discard' to confirm.
 ```
-Then cleanup.
+After confirmation:
+```bash
+cd <original-directory>
+git worktree remove <worktree-path>
+git branch -D <feature-branch>
+```
 
-### Step 5: Cleanup Worktree (Options 1, 2, 4)
+### Step 5: Cleanup Worktree (Options 1, 2)
 
 ```bash
 cd <original-directory>

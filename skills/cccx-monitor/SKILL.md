@@ -39,6 +39,7 @@ For each health endpoint:
 ```bash
 # If health-check.sh was installed (via install.sh --with-scripts):
 bash ~/.claude/scripts/health-check.sh <url> \
+  --method <method> \
   --expected-status <code> \
   --expected-body "<substring>" \
   --timeout 10
@@ -47,8 +48,8 @@ bash ~/.claude/scripts/health-check.sh <url> \
 If `~/.claude/scripts/health-check.sh` does not exist, use curl directly:
 
 ```bash
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "<url>")
-echo "Health: <url> returned $STATUS (expected <code>)"
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X <METHOD> --max-time 10 "<url>")
+echo "Health: <METHOD> <url> returned $STATUS (expected <code>)"
 ```
 
 ### Step 3: Run Validation Commands

@@ -19,11 +19,15 @@ Create an isolated git worktree for feature development. Keeps the main working 
 
 ### Step 1: Choose Worktree Directory
 
+Determine the worktree base directory. Store the result as `WORKTREE_BASE` -- all subsequent steps use this variable, not a hardcoded path.
+
 Check in order:
 
 1. **Existing directory:**
    ```bash
-   ls -d .worktrees 2>/dev/null || ls -d worktrees 2>/dev/null
+   if [ -d ".worktrees" ]; then WORKTREE_BASE=".worktrees"
+   elif [ -d "worktrees" ]; then WORKTREE_BASE="worktrees"
+   fi
    ```
    If found, use it. If both exist, prefer `.worktrees`.
 
@@ -31,42 +35,47 @@ Check in order:
    ```bash
    grep -i "worktree" CLAUDE.md 2>/dev/null
    ```
-   If specified, use that path.
+   If a custom path is specified, set `WORKTREE_BASE` to that path.
 
-3. **Default:** Create `.worktrees/` in the project root.
+3. **Default:** `WORKTREE_BASE=".worktrees"`
 
 ### Step 2: Verify .gitignore
 
-The worktree directory must be in `.gitignore`:
+The `WORKTREE_BASE` directory must be in `.gitignore`:
 
 ```bash
-git check-ignore -q .worktrees 2>/dev/null
+git check-ignore -q "$WORKTREE_BASE" 2>/dev/null
 ```
 
 If NOT ignored:
-1. Add `.worktrees/` (or `worktrees/`) to `.gitignore`
-2. Do **NOT** commit this change yet -- `.gitignore` takes effect from the working tree regardless of commit state. Committing would mutate the current branch (likely main) before isolation exists.
-3. Proceed to Step 3. The `.gitignore` change will be picked up automatically.
-4. Note for the user: "Added .worktrees/ to .gitignore (uncommitted). You may want to commit this separately."
+1. Add `$WORKTREE_BASE/` to `.gitignore`
+2. Do **NOT** commit this change -- `.gitignore` takes effect from the working tree regardless of commit state. Committing would mutate the current branch (likely main) before isolation exists.
+3. Proceed to Step 3.
+4. Note for the user: "Added $WORKTREE_BASE/ to .gitignore (uncommitted). You may want to commit this separately."
 
 ### Step 3: Create Worktree
 
+Use `WORKTREE_BASE` from Step 1:
+
 ```bash
 BRANCH_NAME="feature/<descriptive-name>"
-WORKTREE_PATH=".worktrees/<descriptive-name>"
+WORKTREE_PATH="$WORKTREE_BASE/<descriptive-name>"
 
+mkdir -p "$WORKTREE_BASE"
 git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME"
 cd "$WORKTREE_PATH"
 ```
 
 ### Step 4: Run Project Setup
 
-Auto-detect and install dependencies:
+Auto-detect and install dependencies. Prefer lockfile-respecting commands when available:
 
 ```bash
-[ -f package.json ] && npm install
+if [ -f package-lock.json ]; then npm ci
+elif [ -f package.json ]; then npm install
+fi
 [ -f Cargo.toml ] && cargo build
-[ -f requirements.txt ] && pip install -r requirements.txt
+if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 [ -f go.mod ] && go mod download
 [ -f Gemfile ] && bundle install
 ```
@@ -106,6 +115,7 @@ git worktree remove <worktree-path>
 
 ## Red Flags
 
+- Using a hardcoded path instead of `WORKTREE_BASE` from Step 1
 - Creating a worktree without verifying .gitignore
 - Committing .gitignore changes to main/master before the feature branch exists
 - Starting work on main/master without explicit user consent

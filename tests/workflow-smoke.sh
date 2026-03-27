@@ -53,6 +53,8 @@ echo ""
 # ---------- Setup ----------
 cd "$WORK_DIR"
 git init -q
+git config user.name "CCCXDevOps Test"
+git config user.email "test@cccxdevops.local"
 echo "test" > README.md
 git add README.md
 git commit -q -m "init"

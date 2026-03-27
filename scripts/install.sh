@@ -60,10 +60,14 @@ fi
 echo "  Done."
 echo ""
 
-# Step 2: Copy scripts (optional, clean first)
+# Step 2: Copy scripts (optional, clean stale files first)
 if [ "$WITH_SCRIPTS" = true ]; then
     echo "[2/3] Copying scripts to $SCRIPTS_TARGET ..."
     mkdir -p "$SCRIPTS_TARGET"
+    # Remove previously installed cccx scripts to avoid stale leftovers
+    for existing in "$SCRIPTS_TARGET"/health-check.sh "$SCRIPTS_TARGET"/review-context.sh; do
+        rm -f "$existing"
+    done
     for script_file in "$REPO_DIR"/scripts/*.sh; do
         if [ -f "$script_file" ] && [ "$(basename "$script_file")" != "install.sh" ]; then
             cp "$script_file" "$SCRIPTS_TARGET/"
