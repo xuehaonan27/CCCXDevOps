@@ -1,1001 +1,1021 @@
-# CCCXDevOps Development Plan
+# CCCXDevOps Development Plan v2
 
-> **Status:** Draft v1 — pending Codex review
+> **Status:** Draft v2 for Claude Code review
 > **Date:** 2026-03-27
-> **Author:** Claude Code (Opus 4.6)
-> **Reviewers:** Codex (for architectural and completeness review)
+> **Author:** Codex
+> **Supersedes:** Draft v1 by Claude Code
 
 ---
 
 ## 1. Executive Summary
 
-CCCXDevOps is a framework for Claude Code and Codex to collaborate on **Development, Operations, and Maintenance** tasks. Claude Code executes workflows; Codex reviews and advises at critical checkpoints. The framework is implemented as **pure Skills (Markdown files) and support scripts** — no framework, no daemon, no database. Installation is `cp -r`.
+CCCXDevOps v1 will focus on one collaboration model only:
 
-**Key design decisions:**
-- Combine ARIS's `cp -r` skill architecture + Codex MCP review pattern with superpowers' TDD discipline + software dev workflows
-- Extend scope from pure-dev (superpowers) and pure-research (ARIS) to full DevOps
-- All skills prefixed `cccx-` to coexist with other installed skills
-- Codex reviews at every major gate (design, plan, implementation, deployment, maintenance action)
+- **Claude Code** is the primary executor
+- **Codex** is the external reviewer
+- **Claude Code skills + small support scripts** are the implementation medium
+- **No cross-platform support** is included in v1
 
----
+The original draft had the right direction, but the first version was too broad, too review-heavy, and too loosely validated. This v2 narrows the work to a validated vertical slice:
 
-## 2. Design Principles
+1. a complete **development workflow**
+2. a small, safety-first **operations pilot** for deploy + monitor
+3. a concrete **skill test harness**
 
-### 2.1 Borrowed from ARIS (Auto-claude-code-research-in-sleep)
+The core architectural change is to keep the **generic Codex MCP review framework**, but **centralize all direct MCP transport in one skill**: `cccx-review`.
 
-| Principle | How We Adopt It |
-|-----------|-----------------|
-| **Zero Framework** | Skills are Markdown files. Scripts are standalone `.sh`/`.py`. No build step, no daemon |
-| **`cp -r` Installation** | Copy `skills/*` to `~/.claude/skills/`. Done |
-| **Codex MCP Review** | Claude Code calls `mcp__codex__codex` at checkpoints. Thread continuity via `mcp__codex__codex-reply` |
-| **Composable Workflows** | Single skills chain into pipelines. Run `/cccx-pipeline` for everything, or `/cccx-brainstorm` alone |
-| **Constants Section** | Configurable parameters (AUTO_PROCEED, MAX_ROUNDS, etc.) in each skill |
-| **State Persistence** | JSON state files for long-running operations (review loops, deployments) |
-| **Templates** | Structured input templates for complex workflows |
-| **Shared References** | Common guidelines referenced by multiple skills |
+That gives CCCXDevOps three logical layers without turning v1 into a multi-platform project:
 
-### 2.2 Borrowed from superpowers
+- **Core workflow content**: skill logic, references, templates, workflow rules
+- **Claude host adapter**: installation, bootstrap skill, Claude-specific conventions
+- **Codex review overlay**: review profiles, prompt assembly, thread handling, escalation rules
 
-| Principle | How We Adopt It |
-|-----------|-----------------|
-| **TDD Discipline** | Iron Law: NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST |
-| **Systematic Debugging** | Iron Law: NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST |
-| **Verification Before Claims** | Iron Law: NO COMPLETION CLAIMS WITHOUT FRESH EVIDENCE |
-| **Design Before Code** | Brainstorm -> Plan -> Implement (never skip design) |
-| **Subagent-Driven Development** | Fresh agent per task + two-stage review (spec then quality) |
-| **Git Worktree Isolation** | Isolated workspaces for feature work |
-| **Evidence Over Claims** | Run commands, read output, cite evidence. No "should work" |
-| **Rationalization Defense** | Skills explicitly counter common shortcuts and excuses |
-| **TDD for Skills** | New skills are tested with pressure scenarios before shipping |
-
-### 2.3 New in CCCXDevOps
-
-| Principle | Description |
-|-----------|-------------|
-| **DevOps Complete** | Development + Operations + Maintenance in one framework |
-| **`cccx-` Prefix** | All skills namespaced to avoid conflicts with user's existing skills |
-| **Cross-Model Adversarial Review** | Claude Code executes fast; Codex reviews rigorously. Two-player game beats self-play |
-| **Checkpoint-Driven Autonomy** | `AUTO_PROCEED=true` auto-advances; `=false` pauses for human approval |
-| **Ops Iron Laws** | NO DEPLOYMENT WITHOUT ROLLBACK PLAN; NO INFRA CHANGE WITHOUT REVIEW |
-| **Maintenance Discipline** | NO DEPENDENCY UPDATE WITHOUT TEST VERIFICATION; NO SECURITY FIX WITHOUT REGRESSION CHECK |
+This split preserves the simplicity of `cp -r` installation while preventing every skill from embedding transport details.
 
 ---
 
-## 3. Architecture
+## 2. Constraints and Non-Goals
 
-### 3.1 Directory Structure
+### 2.1 Constraints
 
-```
+- v1 supports **Claude Code + Codex review only**
+- Skills must remain plain Markdown plus a small number of shell scripts
+- Installation must stay lightweight: copy skills, optionally copy scripts, configure Codex MCP
+- Skills should remain understandable without auxiliary infrastructure
+
+### 2.2 Non-Goals for v1
+
+- No Codex-native skill package
+- No Cursor, Gemini, OpenCode, or other host support
+- No daemon, service, database, or background scheduler
+- No full maintenance suite yet
+- No broad infra mutation workflows yet
+- No notification integrations yet
+- No claim that operations skills are "zero config"
+
+### 2.3 v1 Safety Position
+
+Development skills can be largely workflow-driven.
+
+Operations skills cannot safely be zero-context. For deploy and monitor work, v1 will require an explicit service/environment profile. The system may assist with execution, but it must not pretend to know deployment topology, cluster boundaries, rollback steps, or health endpoints without project-provided configuration.
+
+---
+
+## 3. Reference-Derived Decisions
+
+### 3.1 Adopted from ARIS
+
+| Reference Pattern | v2 Decision |
+|------------------|-------------|
+| Plain Markdown skills | Keep |
+| `cp -r` installation style | Keep |
+| Cross-model review | Keep |
+| Workflow composition | Keep |
+| Constants and inline overrides | Keep, but only where they matter |
+| State files for long-running flows | Defer until a concrete workflow needs them |
+| Reviewer overlay concept | Keep conceptually via `cccx-review` + review profiles |
+
+### 3.2 Adopted from superpowers
+
+| Reference Pattern | v2 Decision |
+|------------------|-------------|
+| Process-first workflow | Keep |
+| Bootstrap skill that enforces skill usage | Add as `cccx-using-devops` |
+| TDD discipline | Keep |
+| Systematic debugging | Keep |
+| Subagent-driven implementation | Keep |
+| Skill testing and trigger testing | Move into Phase 1 |
+| Detailed plans with exact tasks | Keep |
+
+### 3.3 Explicit Rejections from v1
+
+The following v1 assumptions are intentionally removed:
+
+- Every major skill directly talks to Codex MCP
+- Every review returns a numeric score
+- All domains should ship in one initial release
+- Ops skills can be installed and used safely with no project configuration
+- Testing can wait until after the skill catalog is mostly written
+
+---
+
+## 4. Architecture
+
+### 4.1 Logical Layers
+
+#### A. Core Workflow Content
+
+This is the reusable methodology layer:
+
+- development workflow skills
+- ops pilot skills
+- shared references
+- templates
+- prompt fragments used by worker/reviewer skills
+
+This layer contains the "what to do" logic.
+
+#### B. Claude Host Adapter
+
+This is the Claude Code-specific layer:
+
+- install path conventions
+- bootstrap skill
+- tool usage expectations
+- Claude-facing README and installation guide
+- test harness that validates Claude skill triggering and compliance
+
+This layer contains the "how Claude Code should load and obey the skills" logic.
+
+#### C. Codex Review Overlay
+
+This is the Codex reviewer layer:
+
+- generic Codex MCP interaction pattern
+- review profiles by domain
+- context collection rules
+- verdict parsing
+- escalation and retry policy
+
+This layer contains the "how external review is requested and interpreted" logic.
+
+### 4.2 Key Architectural Rule
+
+**Only `cccx-review` owns direct Codex MCP transport.**
+
+Other skills may declare checkpoints such as:
+
+- "request design review"
+- "request implementation diff review"
+- "request deploy safety review"
+
+But they do so by invoking `cccx-review` with:
+
+- a named review profile
+- a subject
+- a bounded context bundle
+- explicit evidence
+
+This prevents review logic from being duplicated across the repository.
+
+### 4.3 Repository Structure
+
+```text
 CCCXDevOps/
-├── skills/                              # All skill definitions
-│   ├── cccx-brainstorm/                 # Design exploration
+├── skills/
+│   ├── cccx-using-devops/
 │   │   └── SKILL.md
-│   ├── cccx-plan/                       # Implementation planning
+│   ├── cccx-brainstorm/
 │   │   └── SKILL.md
-│   ├── cccx-tdd/                        # TDD discipline enforcement
+│   ├── cccx-plan/
+│   │   └── SKILL.md
+│   ├── cccx-tdd/
 │   │   ├── SKILL.md
-│   │   └── testing-anti-patterns.md     # Common testing mistakes
-│   ├── cccx-implement/                  # Subagent-driven implementation
+│   │   └── testing-anti-patterns.md
+│   ├── cccx-implement/
 │   │   ├── SKILL.md
-│   │   ├── implementer-prompt.md        # Subagent dispatch template
-│   │   ├── spec-reviewer-prompt.md      # Spec compliance review template
-│   │   └── quality-reviewer-prompt.md   # Code quality review template
-│   ├── cccx-review/                     # Codex MCP code review
+│   │   ├── implementer-prompt.md
+│   │   ├── spec-reviewer-prompt.md
+│   │   └── code-quality-reviewer-prompt.md
+│   ├── cccx-review/
 │   │   └── SKILL.md
-│   ├── cccx-debug/                      # Systematic debugging
+│   ├── cccx-verify/
+│   │   └── SKILL.md
+│   ├── cccx-debug/
 │   │   ├── SKILL.md
-│   │   ├── root-cause-tracing.md        # Trace-back technique
-│   │   └── defense-in-depth.md          # Multi-layer validation
-│   ├── cccx-verify/                     # Verification before completion
+│   │   ├── root-cause-tracing.md
+│   │   └── defense-in-depth.md
+│   ├── cccx-worktree/
 │   │   └── SKILL.md
-│   ├── cccx-worktree/                   # Git worktree management
+│   ├── cccx-finish/
 │   │   └── SKILL.md
-│   ├── cccx-finish/                     # Branch completion
+│   ├── cccx-dev-pipeline/
 │   │   └── SKILL.md
-│   ├── cccx-dev-pipeline/               # Full development pipeline
+│   ├── cccx-deploy/
 │   │   └── SKILL.md
-│   ├── cccx-deploy/                     # Deployment management
+│   ├── cccx-monitor/
 │   │   └── SKILL.md
-│   ├── cccx-monitor/                    # Health monitoring
-│   │   └── SKILL.md
-│   ├── cccx-incident/                   # Incident response
-│   │   └── SKILL.md
-│   ├── cccx-ci-cd/                      # CI/CD pipeline management
-│   │   └── SKILL.md
-│   ├── cccx-infra/                      # Infrastructure management
-│   │   └── SKILL.md
-│   ├── cccx-ops-pipeline/               # Full operations pipeline
-│   │   └── SKILL.md
-│   ├── cccx-deps/                       # Dependency management
-│   │   └── SKILL.md
-│   ├── cccx-security/                   # Security assessment
-│   │   └── SKILL.md
-│   ├── cccx-perf/                       # Performance audit
-│   │   └── SKILL.md
-│   ├── cccx-tech-debt/                  # Technical debt management
-│   │   └── SKILL.md
-│   ├── cccx-docs/                       # Documentation maintenance
-│   │   └── SKILL.md
-│   ├── cccx-maint-pipeline/             # Full maintenance pipeline
-│   │   └── SKILL.md
-│   ├── cccx-pipeline/                   # Full DevOps orchestrator
-│   │   └── SKILL.md
-│   ├── cccx-parallel/                   # Parallel agent dispatch
-│   │   └── SKILL.md
-│   ├── cccx-writing-skills/             # Skill creation (meta-skill)
-│   │   └── SKILL.md
-│   └── shared-references/               # Common guidelines
-│       ├── codex-review-criteria.md     # Review criteria per skill type
-│       ├── code-quality-principles.md   # Code quality standards
-│       ├── ops-checklists.md            # Operations safety checklists
-│       ├── security-baselines.md        # Security standards
-│       └── tdd-principles.md            # TDD guidelines
-├── scripts/                             # Support scripts
-│   ├── install.sh                       # Installation helper
-│   ├── health-check.sh                  # Generic health check runner
-│   └── state-manager.sh                 # State file read/write helper
-├── templates/                           # Input templates
-│   ├── FEATURE_BRIEF.md                 # Feature request template
-│   ├── INCIDENT_REPORT.md               # Incident report template
-│   ├── DEPLOYMENT_PLAN.md               # Deployment plan template
-│   └── MAINTENANCE_REQUEST.md           # Maintenance request template
-├── docs/                                # Documentation
-│   ├── DEVELOPMENT_PLAN.md              # This file
-│   ├── INSTALLATION.md                  # Installation guide
-│   └── SKILL_CATALOG.md                 # Full skill reference
-├── CLAUDE.md                            # Project instructions
-├── AGENTS.md                            # Agent instructions (-> CLAUDE.md)
-└── README.md                            # Project overview
+│   └── shared-references/
+│       ├── code-quality-principles.md
+│       ├── tdd-principles.md
+│       ├── deploy-safety-checklist.md
+│       └── review-profiles/
+│           ├── dev-design.md
+│           ├── dev-plan.md
+│           ├── dev-implementation.md
+│           └── deploy-safety.md
+├── scripts/
+│   ├── install.sh
+│   ├── health-check.sh
+│   └── review-context.sh
+├── templates/
+│   ├── FEATURE_BRIEF.md
+│   ├── SERVICE_PROFILE.md
+│   └── DEPLOYMENT_PLAN.md
+├── tests/
+│   ├── claude-code/
+│   ├── skill-triggering/
+│   ├── fixtures/
+│   └── mocks/
+├── docs/
+│   ├── DEVELOPMENT_PLAN.md
+│   ├── DEVELOPMENT_PLAN_V2_REVIEW_BRIEF.md
+│   ├── INSTALLATION.md
+│   └── SKILL_CATALOG.md
+├── CLAUDE.md
+└── README.md
 ```
 
-### 3.2 Skill File Format
+---
 
-Every skill follows this format (unified from ARIS + superpowers):
+## 5. Skill Authoring Conventions
+
+### 5.1 Frontmatter
+
+Required:
+
+- `name`
+- `description`
+
+Optional:
+
+- `argument-hint`
+- `allowed-tools`
+
+v1 will not force ARIS-style extended frontmatter on every skill. Use extra fields only when they materially help Claude Code.
+
+### 5.2 Description Rule
+
+Descriptions must describe **triggering conditions only**, not workflow summaries.
+
+Good:
+
+```yaml
+description: Use when implementing a multi-step feature after the design is approved
+```
+
+Bad:
+
+```yaml
+description: Use when implementing a feature by dispatching subagents and reviewing every task
+```
+
+### 5.3 Skill Structure
+
+Preferred structure:
 
 ```markdown
----
-name: cccx-skill-name
-description: "Use when [specific triggering conditions]. Examples: [trigger phrases]"
-argument-hint: [optional-argument]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
----
-
 # Skill Title
 
-## Constants
-- PARAM_NAME = value -- description
-- AUTO_PROCEED = true -- auto-advance at checkpoints (set false for human gates)
-
 ## Overview
-[1-2 sentence core principle]
 
 ## When to Use
-[Bullet list of triggering conditions / symptoms]
 
 ## Workflow
-[Step-by-step instructions with phases]
-
-## Codex Review Checkpoints
-[Where and how Codex is consulted]
 
 ## Red Flags
-[STOP conditions -- when to halt and escalate]
 
 ## Common Mistakes
-[What goes wrong + fixes]
 ```
 
-**Key conventions:**
-- `name` always starts with `cccx-`
-- `description` starts with "Use when..." and lists triggering conditions only (not workflow summary)
-- `allowed-tools` explicitly lists every tool the skill may use, including MCP tools
-- `argument-hint` is optional; shows what argument the skill accepts
+Add sections only when they serve a real workflow need. Do not force identical section lists into every skill.
 
-### 3.3 Codex MCP Integration Pattern
+### 5.4 Token Discipline
 
-All skills that include Codex review follow this pattern:
-
-```markdown
-## Codex Review Checkpoint
-
-### Sending for Review:
-Call `mcp__codex__codex` with:
-- config: {"model_reasoning_effort": "high"}   # or "xhigh" for critical reviews
-- prompt: |
-    You are reviewing [CONTEXT] for a DevOps workflow.
-
-    [FULL CONTEXT TO REVIEW]
-
-    Review criteria:
-    1. [Criterion specific to this skill type]
-    2. [Criterion specific to this skill type]
-    ...
-
-    Respond with:
-    - VERDICT: APPROVE / REQUEST_CHANGES / BLOCK
-    - SCORE: 1-10
-    - ISSUES: [list of specific issues]
-    - SUGGESTIONS: [list of improvements]
-
-### Handling Response:
-- APPROVE (score >= 7): Proceed to next phase
-- REQUEST_CHANGES (score 4-6): Address issues, re-submit via mcp__codex__codex-reply
-- BLOCK (score < 4): STOP. Present issues to user. Do not proceed without human decision.
-
-### Thread Continuity:
-Save threadId from first call. Use mcp__codex__codex-reply for follow-up rounds.
-Max 3 review rounds per checkpoint. If still BLOCK after 3 rounds, escalate to human.
-```
-
-**Review criteria vary by domain:**
-
-| Domain | Review Focus |
-|--------|-------------|
-| **Development** | Code quality, test coverage, spec compliance, API design, error handling |
-| **Operations** | Safety, rollback plan, monitoring coverage, blast radius, gradual rollout |
-| **Maintenance** | Regression risk, backward compatibility, documentation updates, test coverage |
-
-### 3.4 Installation Mechanism
-
-```bash
-# Clone repository
-git clone <repo-url> CCCXDevOps
-
-# Install skills (the only required step)
-cp -r CCCXDevOps/skills/cccx-* ~/.claude/skills/
-cp -r CCCXDevOps/skills/shared-references ~/.claude/skills/
-
-# Optional: install support scripts
-mkdir -p ~/.claude/scripts
-cp CCCXDevOps/scripts/* ~/.claude/scripts/
-
-# Set up Codex MCP (required for review features)
-npm install -g @openai/codex
-codex setup                           # Choose model: gpt-5.4 recommended
-claude mcp add codex -s user -- codex mcp-server
-```
-
-Or use the helper script:
-```bash
-bash CCCXDevOps/scripts/install.sh
-```
-
-**Uninstall:**
-```bash
-rm -rf ~/.claude/skills/cccx-*
-rm -rf ~/.claude/skills/shared-references
-```
+- Frequently loaded skills must stay short
+- Heavy references belong in supporting docs under `shared-references/`
+- Prompt templates belong in sibling files when they exceed a few dozen lines
 
 ---
 
-## 4. Skill Catalog
+## 6. Generic Codex MCP Review Framework
 
-### 4.1 Development Skills (10 skills)
+### 6.1 Why Keep It Generic
 
-#### `cccx-brainstorm` -- Design Exploration
-- **Source:** superpowers/brainstorming, adapted
-- **Trigger:** Before any creative work -- features, components, architecture changes
-- **Input:** User request or `FEATURE_BRIEF.md` template
-- **Process:**
-  1. Explore project context (files, docs, recent commits)
-  2. Ask clarifying questions (one at a time)
-  3. Propose 2-3 approaches with trade-offs
-  4. Present design in sections
-  5. Write design doc to `docs/cccx/specs/YYYY-MM-DD-<topic>-design.md`
-  6. **Codex checkpoint:** Review design for completeness, ambiguity, risks
-  7. User reviews final spec
-- **Output:** Approved design document
-- **Chain next:** `cccx-plan`
-- **Hard Gate:** NO CODE until design is approved
+The review framework should work for:
 
-#### `cccx-plan` -- Implementation Planning
-- **Source:** superpowers/writing-plans, adapted
-- **Trigger:** After approved design, before touching code
-- **Input:** Approved design document
-- **Process:**
-  1. Scope check (split if multi-system)
-  2. Design file structure with clear boundaries
-  3. Write tasks at 2-5 minute granularity
-  4. Each task: write failing test -> run -> implement -> run -> commit
-  5. Include complete code (NO PLACEHOLDERS)
-  6. Self-review for gaps
-  7. **Codex checkpoint:** Review plan for completeness, task granularity, missing edge cases
-- **Output:** Implementation plan at `docs/cccx/plans/YYYY-MM-DD-<feature>.md`
-- **Chain next:** `cccx-implement`
-- **Hard Gate:** NO PLACEHOLDERS ("TBD", "TODO", "similar to Task N")
+- design review
+- implementation plan review
+- code diff review
+- deploy safety review
+- future complex ops reviews such as Kubernetes maintenance
 
-#### `cccx-tdd` -- Test-Driven Development Discipline
-- **Source:** superpowers/test-driven-development, adapted
-- **Trigger:** Always, for new features, bug fixes, refactoring, behavior changes
-- **Iron Law:** `NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST`
-- **Process:** RED (write failing test) -> verify RED -> GREEN (minimal code) -> verify GREEN -> REFACTOR
-- **Not a pipeline skill** -- this is a discipline skill invoked by `cccx-implement` and `cccx-debug`
-- **Common Rationalizations (all wrong):**
-  - "Too simple to test" -> Simple code breaks
-  - "I'll test after" -> Tests-after prove nothing about intent
-  - "TDD slows me down" -> TDD is faster than debugging
+The transport pattern should stay generic even though v1 only ships a few review profiles.
 
-#### `cccx-implement` -- Subagent-Driven Implementation
-- **Source:** superpowers/subagent-driven-development + ARIS review pattern
-- **Trigger:** Have implementation plan with tasks to execute
-- **Input:** Implementation plan
-- **Process:**
-  1. Set up worktree (invoke `cccx-worktree`)
-  2. For each task:
-     a. Dispatch implementer subagent (fresh context, uses `cccx-tdd`)
-     b. Handle status: DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT
-     c. Dispatch spec reviewer subagent (verify code matches spec)
-     d. Dispatch quality reviewer subagent (clean, tested, maintainable)
-     e. Fix issues if any, re-review until passing
-  3. After all tasks: final code review
-  4. **Codex checkpoint:** Review entire implementation for architectural coherence
-- **Output:** Implemented feature with tests
-- **Chain next:** `cccx-verify` -> `cccx-finish`
-- **Red Flags:**
-  - Never start on main/master without explicit consent
-  - Never skip reviews (both spec AND quality)
-  - Never dispatch parallel implementers (conflict risk)
+### 6.2 Ownership Model
 
-#### `cccx-review` -- Codex MCP Code Review
-- **Source:** ARIS Codex MCP + superpowers code-reviewer
-- **Trigger:** After implementation, before merge. Also on-demand
-- **Input:** Git diff (BASE_SHA -> HEAD_SHA)
-- **Process:**
-  1. Collect diff and context
-  2. Format review request with skill-specific criteria
-  3. Send to Codex via `mcp__codex__codex`
-  4. Parse response: APPROVE / REQUEST_CHANGES / BLOCK
-  5. If REQUEST_CHANGES: address issues, re-submit via `mcp__codex__codex-reply`
-  6. Max 3 rounds; escalate to human if still blocked
-- **Output:** Review verdict with action items
-- **Used by:** All pipeline skills at their Codex checkpoints
+`cccx-review` owns:
 
-#### `cccx-debug` -- Systematic Debugging
-- **Source:** superpowers/systematic-debugging, adapted
-- **Trigger:** Any bug, test failure, unexpected behavior, performance problem
-- **Iron Law:** `NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST`
-- **Process:**
-  1. **Phase 1: Root Cause Investigation** -- read errors, reproduce, check recent changes, trace data flow
-  2. **Phase 2: Pattern Analysis** -- find working examples, compare, identify differences
-  3. **Phase 3: Hypothesis** -- form single hypothesis, test minimally, one variable at a time
-  4. **Phase 4: Implementation** -- failing test (via `cccx-tdd`), single fix, verify
-  5. If 3+ fixes fail: **STOP and question architecture**
-  6. **Codex checkpoint (optional):** For complex bugs, consult Codex after Phase 2
-- **Output:** Root cause identified and fixed with regression test
-- **Red Flags:**
-  - "Quick fix for now" -- NO
-  - "Just try changing X" -- NO
-  - "I don't fully understand but this might work" -- NO
+- Codex MCP tool invocation
+- review prompt assembly
+- thread continuity
+- retry rules
+- verdict parsing
+- escalation rules
 
-#### `cccx-verify` -- Verification Before Completion
-- **Source:** superpowers/verification-before-completion, adapted
-- **Trigger:** Before ANY success/completion claim
-- **Iron Law:** `NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE`
-- **Process:**
-  1. IDENTIFY: What command proves this claim?
-  2. RUN: Execute full command (fresh)
-  3. READ: Full output, check exit code
-  4. VERIFY: Does output confirm claim?
-  5. Only then: make the claim WITH evidence
-- **Forbidden language:** "should", "probably", "seems to", "looks correct"
-- **Used by:** All pipeline skills before claiming completion
+All other skills own:
 
-#### `cccx-worktree` -- Git Worktree Management
-- **Source:** superpowers/using-git-worktrees, simplified
-- **Trigger:** Starting feature work needing isolation
-- **Process:**
-  1. Check for existing worktree directory (`.worktrees/` or `worktrees/`)
-  2. Verify directory is in `.gitignore`
-  3. Create worktree with feature branch
-  4. Run project setup (detect: npm/cargo/pip/go)
-  5. Verify clean baseline (tests pass)
-  6. Report location and status
-- **Output:** Isolated worktree ready for development
+- when review is required
+- what evidence must be collected
+- which review profile applies
 
-#### `cccx-finish` -- Branch Completion
-- **Source:** superpowers/finishing-a-development-branch, adapted
-- **Trigger:** Implementation complete, all tests passing
-- **Process:**
-  1. Verify all tests pass (via `cccx-verify`)
-  2. **Codex checkpoint:** Final review of entire branch diff
-  3. Present 4 options: merge locally / push + PR / keep branch / discard
-  4. Execute chosen option
-  5. Clean up worktree if applicable
-- **Output:** Merged code or PR
+### 6.3 Review Request Contract
 
-#### `cccx-dev-pipeline` -- Full Development Pipeline
-- **Source:** Original composition
-- **Trigger:** "build a feature", "develop", "implement" (large scope tasks)
-- **Chain:**
-  ```
-  cccx-brainstorm -> cccx-plan -> cccx-worktree -> cccx-implement -> cccx-verify -> cccx-finish
-       |                |                                  |                              |
-   [Codex review]  [Codex review]                   [Codex review]                [Codex review]
-  ```
-- **Constants:**
-  - AUTO_PROCEED = true (auto-advance between phases)
-  - Set false for human gates at each checkpoint
-- **State Persistence:** `PIPELINE_STATE.json` for session recovery
+Every review request should supply:
 
-### 4.2 Operations Skills (6 skills)
+- `profile`: named review profile
+- `subject`: what is being reviewed
+- `goal`: what the actor is trying to accomplish
+- `context`: bounded, relevant background only
+- `evidence`: commands, diffs, logs, docs, manifests, test output
+- `constraints`: rollout limits, no-downtime requirement, branch rules, etc.
+- `questions`: optional focal questions for Codex
 
-#### `cccx-deploy` -- Deployment Management
-- **Trigger:** "deploy", "release", "ship", "push to production"
-- **Iron Law:** `NO DEPLOYMENT WITHOUT ROLLBACK PLAN`
-- **Process:**
-  1. **Pre-flight:** Verify tests pass, check environment, confirm target
-  2. **Plan:** Generate deployment plan (strategy, order, rollback steps)
-  3. **Codex checkpoint:** Review deployment plan for safety, blast radius, rollback coverage
-  4. **Execute:** Run deployment steps with verification at each stage
-  5. **Verify:** Post-deployment health checks, smoke tests
-  6. **Monitor:** Watch for errors in first 15 minutes (configurable)
-- **Strategies supported:** Rolling, blue-green, canary (detected from project config)
-- **Rollback:** Automatic rollback trigger if health checks fail
-- **Output:** Deployment result with verification evidence
+### 6.4 Review Response Contract
 
-#### `cccx-monitor` -- Health Monitoring
-- **Trigger:** "check health", "monitor", "is it running", "check status"
-- **Process:**
-  1. Identify monitoring targets (services, endpoints, resources)
-  2. Run health checks (HTTP probes, process checks, resource checks)
-  3. Collect metrics (CPU, memory, disk, response times)
-  4. Compare against thresholds
-  5. Report status with evidence
-- **Can be scheduled:** Via CronCreate for periodic checks
-- **Output:** Health report with status per target
+v1 will use a risk-oriented schema instead of a mandatory score:
 
-#### `cccx-incident` -- Incident Response
-- **Trigger:** "outage", "incident", "service down", "pages", "alert firing"
-- **Process:**
-  1. **Classify:** Severity (P0-P3) based on impact
-  2. **Investigate:** Adapted from `cccx-debug` Phase 1-2 (root cause investigation, pattern analysis)
-  3. **Mitigate:** Immediate actions to restore service
-  4. **Communicate:** Status update templates (internal, external)
-  5. **Resolve:** Fix root cause, verify resolution
-  6. **Post-mortem:** Generate post-mortem document
-  7. **Codex checkpoint:** Review post-mortem for completeness, action items
-- **Output:** Incident resolved + post-mortem document
-- **Templates:** `INCIDENT_REPORT.md`
+- `VERDICT`: `APPROVE` | `REQUEST_CHANGES` | `BLOCK`
+- `RISK`: `LOW` | `MEDIUM` | `HIGH` | `CRITICAL`
+- `BLOCKERS`: concrete issues that prevent proceeding
+- `QUESTIONS`: anything unresolved
+- `REQUIRED_EVIDENCE`: what must be shown before approval
+- `SUGGESTED_NEXT_STEP`: smallest safe next action
 
-#### `cccx-ci-cd` -- CI/CD Pipeline Management
-- **Trigger:** "set up CI", "fix pipeline", "add deployment step", "CI failing"
-- **Process:**
-  1. Detect CI/CD platform (GitHub Actions, GitLab CI, Jenkins, etc.)
-  2. Analyze current pipeline configuration
-  3. Propose changes with rationale
-  4. **Codex checkpoint:** Review pipeline changes for security, efficiency, correctness
-  5. Implement changes
-  6. Verify pipeline runs correctly
-- **Output:** Updated CI/CD configuration with verification
+Scores may be added by a specific profile if that domain benefits from them, but scores are not part of the universal contract.
 
-#### `cccx-infra` -- Infrastructure Management
-- **Trigger:** "provision", "infrastructure", "terraform", "cloudformation", "server setup"
-- **Iron Law:** `NO INFRA CHANGE WITHOUT REVIEW`
-- **Process:**
-  1. Analyze current infrastructure state
-  2. Propose changes (IaC when possible)
-  3. **Codex checkpoint:** Review infra changes for security, cost, reliability
-  4. Apply changes (with dry-run first)
-  5. Verify infrastructure state matches intent
-- **Output:** Infrastructure changes applied with verification
+### 6.5 Thread Handling
 
-#### `cccx-ops-pipeline` -- Full Operations Pipeline
-- **Trigger:** "deploy and monitor", "release pipeline", "ship it end to end"
-- **Chain:**
-  ```
-  cccx-deploy -> cccx-monitor -> [if issues] -> cccx-incident
-       |
-   [Codex review]
-  ```
-- **Constants:** MONITOR_DURATION = 15min, AUTO_ROLLBACK = true
+Base behavior:
 
-### 4.3 Maintenance Skills (6 skills)
+1. First review request uses `mcp__codex__codex`
+2. Follow-up uses `mcp__codex__codex-reply`
+3. `cccx-review` stores the thread id in the immediate workflow context
+4. No other skill needs to know transport details
 
-#### `cccx-deps` -- Dependency Management
-- **Trigger:** "update dependencies", "outdated packages", "npm audit", "vulnerability in package"
-- **Iron Law:** `NO DEPENDENCY UPDATE WITHOUT TEST VERIFICATION`
-- **Process:**
-  1. **Audit:** List outdated/vulnerable dependencies
-  2. **Assess:** Categorize by risk (major/minor/patch, breaking changes)
-  3. **Plan:** Prioritized update order, one at a time for major bumps
-  4. **Codex checkpoint:** Review update plan for risk assessment accuracy
-  5. **Execute:** Update each dependency, run tests after each
-  6. **Verify:** Full test suite passes, no regressions
-- **Output:** Updated dependencies with test verification evidence
+### 6.6 Large Review Handling
 
-#### `cccx-security` -- Security Assessment
-- **Trigger:** "security scan", "vulnerability check", "audit security", "OWASP"
-- **Process:**
-  1. **Scan:** Identify potential vulnerabilities (dependencies, code patterns, secrets)
-  2. **Classify:** Severity (critical/high/medium/low) per CVSS or similar
-  3. **Plan:** Remediation plan prioritized by severity
-  4. **Codex checkpoint:** Review security findings and remediation plan
-  5. **Fix:** Apply fixes with regression tests
-  6. **Verify:** Re-scan confirms vulnerabilities resolved
-- **Output:** Security report with remediation evidence
+For long inputs, `cccx-review` must prefer:
 
-#### `cccx-perf` -- Performance Audit
-- **Trigger:** "slow", "performance", "optimize", "bottleneck", "profiling"
-- **Process:**
-  1. **Baseline:** Establish current performance metrics
-  2. **Profile:** Identify bottlenecks (profiler, timing, resource usage)
-  3. **Analyze:** Root cause of performance issues
-  4. **Plan:** Optimization approach
-  5. **Codex checkpoint:** Review optimization for correctness, regression risk
-  6. **Implement:** Apply optimization with before/after benchmarks
-  7. **Verify:** Measurable improvement without regressions
-- **Output:** Performance improvement with benchmark evidence
+1. bounded summaries
+2. focused evidence excerpts
+3. explicit file lists and diffs
+4. iterative follow-up rounds
 
-#### `cccx-tech-debt` -- Technical Debt Management
-- **Trigger:** "tech debt", "refactor", "cleanup", "code smell", "complexity"
-- **Process:**
-  1. **Identify:** Scan for debt indicators (complexity, duplication, outdated patterns)
-  2. **Catalog:** List items with impact/effort estimates
-  3. **Prioritize:** High impact + low effort first
-  4. **Plan:** Refactoring plan using `cccx-plan` format
-  5. **Codex checkpoint:** Review refactoring plan for regression risk
-  6. **Execute:** Refactor with TDD discipline (via `cccx-tdd`)
-  7. **Verify:** Tests pass, no behavior change (unless intended)
-- **Output:** Cleaned code with verification evidence
+If async review support is needed later, that change should stay inside `cccx-review`.
 
-#### `cccx-docs` -- Documentation Maintenance
-- **Trigger:** "update docs", "documentation", "API docs", "changelog", "README"
-- **Process:**
-  1. **Analyze:** Identify documentation gaps (undocumented APIs, stale docs, missing README sections)
-  2. **Plan:** Documentation update plan
-  3. **Write:** Generate/update documentation
-  4. **Codex checkpoint:** Review docs for accuracy, completeness
-  5. **Verify:** All documented APIs exist, all examples work
-- **Output:** Updated documentation
+### 6.7 Review Profiles in v1
 
-#### `cccx-maint-pipeline` -- Full Maintenance Pipeline
-- **Trigger:** "maintenance sweep", "full audit", "project health check"
-- **Chain:**
-  ```
-  cccx-deps -> cccx-security -> cccx-perf -> cccx-tech-debt -> cccx-docs
-      |             |               |              |               |
-  [Codex]       [Codex]         [Codex]        [Codex]         [Codex]
-  ```
-- **Constants:** SKIP_CLEAN = true (skip categories with no issues found)
+- `dev-design`
+- `dev-plan`
+- `dev-implementation`
+- `deploy-safety`
 
-### 4.4 Cross-Cutting Skills (3 skills)
+### 6.8 Future-Proofing for Kubernetes Maintenance
 
-#### `cccx-pipeline` -- Full DevOps Orchestrator
-- **Trigger:** "full pipeline", "end to end", "develop and deploy"
-- **Process:**
-  1. Classify task type (development / operations / maintenance / mixed)
-  2. Route to appropriate pipeline:
-     - Development: `cccx-dev-pipeline`
-     - Operations: `cccx-ops-pipeline`
-     - Maintenance: `cccx-maint-pipeline`
-     - Mixed: Chain relevant pipelines in sequence
-  3. Cross-domain coordination (e.g., dev -> deploy -> monitor)
-- **Output:** Complete DevOps workflow result
+The generic framework is intentionally suitable for future profiles such as `k8s-maintenance`, where the required evidence would include:
 
-#### `cccx-parallel` -- Parallel Agent Dispatch
-- **Source:** superpowers/dispatching-parallel-agents
-- **Trigger:** 2+ independent tasks that can work concurrently
-- **Process:**
-  1. Identify independent domains
-  2. Create focused agent tasks
-  3. Dispatch in parallel
-  4. Review and integrate results
-  5. Run full verification
-- **Guard:** Don't use when tasks share state or have dependencies
+- cluster/context/namespace
+- current symptoms and impact
+- manifests or Helm/Kustomize diffs
+- `kubectl` evidence
+- rollout and rollback steps
+- blast radius
+- validation checks
 
-#### `cccx-writing-skills` -- Skill Creation (Meta-Skill)
-- **Source:** superpowers/writing-skills
-- **Trigger:** "create a new skill", "write a skill", extending CCCXDevOps
-- **Iron Law:** `NO SKILL WITHOUT A FAILING TEST FIRST` (TDD for documentation)
-- **Process:**
-  1. RED: Run pressure scenario without skill, document baseline
-  2. GREEN: Write minimal skill that addresses observed rationalizations
-  3. REFACTOR: Close loopholes, re-test
-- **Output:** New `cccx-*` skill directory with SKILL.md
+That future profile should be added as a review profile first, not as a full automation skill first.
 
 ---
 
-## 5. Workflow Chains
+## 7. v1 Scope
 
-### 5.1 Full Development Workflow
+### 7.1 In Scope
 
-```
-User: "Build feature X"
-         |
-    cccx-brainstorm
-    ├─ Explore context
-    ├─ Clarify requirements
-    ├─ Propose 2-3 approaches
-    ├─ Write design doc
-    └─ [CODEX REVIEW: design completeness]
-         |
-    cccx-plan
-    ├─ File structure design
-    ├─ Task breakdown (2-5 min each)
-    ├─ Complete code in every task
-    ├─ Self-review
-    └─ [CODEX REVIEW: plan completeness]
-         |
-    cccx-worktree
-    ├─ Create isolated branch
-    ├─ Install dependencies
-    └─ Verify clean baseline
-         |
-    cccx-implement
-    ├─ For each task:
-    │   ├─ Dispatch implementer (uses cccx-tdd)
-    │   ├─ Spec review (subagent)
-    │   └─ Quality review (subagent)
-    └─ [CODEX REVIEW: architectural coherence]
-         |
-    cccx-verify
-    ├─ Run full test suite
-    ├─ Run linter
-    └─ Evidence-based completion claim
-         |
-    cccx-finish
-    ├─ [CODEX REVIEW: final diff review]
-    ├─ Present options (merge/PR/keep/discard)
-    └─ Execute choice, cleanup
+#### Development Workflow
+
+- bootstrap skill
+- brainstorming
+- implementation planning
+- worktree setup
+- TDD discipline
+- subagent-driven implementation
+- centralized external review
+- verification before completion
+- systematic debugging
+- branch finishing
+- end-to-end development pipeline
+
+#### Operations Pilot
+
+- deploy orchestration for projects that already have a known deploy command/process
+- health monitoring driven by explicit service profile
+- deploy safety review through Codex
+
+#### Validation Infrastructure
+
+- trigger tests
+- skill content tests
+- mocked review tests
+- one fixture project for end-to-end development workflow validation
+
+### 7.2 Out of Scope
+
+- `cccx-incident`
+- `cccx-ci-cd`
+- `cccx-infra`
+- `cccx-deps`
+- `cccx-security`
+- `cccx-perf`
+- `cccx-tech-debt`
+- `cccx-docs`
+- `cccx-maint-pipeline`
+- `cccx-pipeline`
+- notifications
+- generalized session recovery/state orchestration
+
+These are deferred until the v1 vertical slice is proven.
+
+---
+
+## 8. Skill Catalog for v1
+
+### 8.1 `cccx-using-devops`
+
+Purpose:
+
+- bootstrap skill that enforces skill lookup before action
+- process skills first, implementation skills second
+- carry the "do not skip workflow discipline" role that `using-superpowers` serves in superpowers
+
+Hard rules:
+
+- skill check before action
+- brainstorming before new development
+- debugging before speculative fixes
+- review checkpoints are mandatory when a workflow declares them
+
+### 8.2 `cccx-brainstorm`
+
+Source:
+
+- superpowers `brainstorming`
+
+Adaptation:
+
+- stays interactive and approval-driven
+- writes a design doc
+- requests external review through `cccx-review` using `dev-design`
+
+Output:
+
+- approved design doc
+
+### 8.3 `cccx-plan`
+
+Source:
+
+- superpowers `writing-plans`
+
+Adaptation:
+
+- preserve detailed tasks, exact paths, full test steps, no placeholders
+- requires an approved design doc
+- requests external review through `cccx-review` using `dev-plan`
+
+Output:
+
+- implementation plan
+
+### 8.4 `cccx-worktree`
+
+Source:
+
+- superpowers `using-git-worktrees`
+
+Adaptation:
+
+- lightweight
+- no external review by default
+- verifies clean baseline before development begins
+
+Output:
+
+- isolated worktree ready for execution
+
+### 8.5 `cccx-tdd`
+
+Source:
+
+- superpowers `test-driven-development`
+
+Adaptation:
+
+- minimal
+- rigid skill
+- used by implementation and debugging flows
+
+Output:
+
+- enforced RED -> GREEN -> REFACTOR discipline
+
+### 8.6 `cccx-implement`
+
+Source:
+
+- superpowers `subagent-driven-development`
+
+Adaptation:
+
+- requires plan + worktree
+- dispatches implementer, spec reviewer, then code-quality reviewer
+- uses `cccx-review` once at the end for whole-implementation external review using `dev-implementation`
+
+Important rule:
+
+- do not duplicate Codex review after every tiny task
+
+Output:
+
+- implemented feature with passing tests and completed internal review loops
+
+### 8.7 `cccx-review`
+
+Purpose:
+
+- central review gateway
+
+Responsibilities:
+
+- load named review profile
+- collect bounded context
+- call Codex
+- parse verdict
+- report blocking items
+- manage follow-up review rounds
+
+Used by:
+
+- `cccx-brainstorm`
+- `cccx-plan`
+- `cccx-implement`
+- `cccx-finish`
+- `cccx-deploy`
+
+### 8.8 `cccx-verify`
+
+Source:
+
+- superpowers `verification-before-completion`
+
+Purpose:
+
+- no success claim without fresh evidence
+
+Output:
+
+- evidence-backed completion statement
+
+### 8.9 `cccx-debug`
+
+Source:
+
+- superpowers `systematic-debugging`
+
+Purpose:
+
+- root cause before fix
+
+External review:
+
+- optional, only for complex or stalled debugging
+
+### 8.10 `cccx-finish`
+
+Source:
+
+- superpowers `finishing-a-development-branch`
+
+Adaptation:
+
+- perform final verification
+- request final external diff review through `cccx-review`
+- present merge/push/keep/discard options
+
+### 8.11 `cccx-dev-pipeline`
+
+Chain:
+
+```text
+cccx-using-devops
+  -> cccx-brainstorm
+  -> cccx-plan
+  -> cccx-worktree
+  -> cccx-implement
+  -> cccx-verify
+  -> cccx-finish
 ```
 
-### 5.2 Full Operations Workflow
+Mandatory external review gates:
 
-```
-User: "Deploy to production"
-         |
-    cccx-deploy
-    ├─ Pre-flight checks
-    ├─ Generate deployment plan
-    ├─ [CODEX REVIEW: safety, rollback, blast radius]
-    ├─ Execute deployment
-    └─ Post-deployment verification
-         |
-    cccx-monitor
-    ├─ Health checks (15 min window)
-    ├─ Metric collection
-    └─ Threshold comparison
-         |
-    [If issues detected]
-         |
-    cccx-incident
-    ├─ Classify severity
-    ├─ Investigate (systematic debugging)
-    ├─ Mitigate / rollback
-    ├─ Resolve root cause
-    └─ [CODEX REVIEW: post-mortem]
-```
+- design
+- implementation plan
+- final implementation
+- final branch diff
 
-### 5.3 Full Maintenance Workflow
+### 8.12 `cccx-deploy` (Ops Pilot)
 
-```
-User: "Run maintenance sweep"
-         |
-    cccx-deps
-    ├─ Audit outdated/vulnerable deps
-    ├─ [CODEX REVIEW: update risk]
-    ├─ Update one at a time
-    └─ Test after each update
-         |
-    cccx-security
-    ├─ Vulnerability scan
-    ├─ [CODEX REVIEW: remediation plan]
-    ├─ Fix vulnerabilities
-    └─ Re-scan verification
-         |
-    cccx-perf
-    ├─ Baseline metrics
-    ├─ Profile + analyze
-    ├─ [CODEX REVIEW: optimization approach]
-    └─ Implement with benchmarks
-         |
-    cccx-tech-debt
-    ├─ Identify + catalog
-    ├─ [CODEX REVIEW: refactoring plan]
-    ├─ Refactor with TDD
-    └─ Verify no regressions
-         |
-    cccx-docs
-    ├─ Gap analysis
-    ├─ [CODEX REVIEW: doc accuracy]
-    └─ Update documentation
-```
+Purpose:
 
-### 5.4 End-to-End DevOps Pipeline
+- orchestrate deployment only when the project already has a known deployment command/process
 
-```
-User: "Full pipeline for feature X"
-         |
-    cccx-pipeline (orchestrator)
-    ├─ Phase 1: Development
-    │   └─ cccx-dev-pipeline (brainstorm -> plan -> implement -> verify -> finish)
-    ├─ Phase 2: Operations
-    │   └─ cccx-ops-pipeline (deploy -> monitor)
-    └─ Phase 3: Maintenance (optional, if requested)
-        └─ cccx-maint-pipeline (deps -> security -> perf -> debt -> docs)
-```
+Requirements:
+
+- `SERVICE_PROFILE.md`
+- deployment plan or enough information to generate one
+- explicit target environment
+- rollback steps documented before execution
+
+External review:
+
+- mandatory via `cccx-review` using `deploy-safety`
+
+v1 guardrails:
+
+- no invented infrastructure changes
+- no automatic strategy selection
+- no silent rollback logic
+- no production deploy without explicit user confirmation
+
+Output:
+
+- deployment result with evidence
+
+### 8.13 `cccx-monitor` (Ops Pilot)
+
+Purpose:
+
+- verify service health using explicit configuration from `SERVICE_PROFILE.md`
+
+Inputs:
+
+- health endpoints
+- expected process/service names
+- relevant checks and thresholds
+
+Implementation:
+
+- backed by `scripts/health-check.sh`
+
+Output:
+
+- health report with evidence and status
 
 ---
 
-## 6. Shared References
+## 9. Shared References and Templates
 
-### 6.1 `codex-review-criteria.md`
-Defines what Codex should check for each skill domain:
+### 9.1 Shared References
 
-- **Development reviews:** Code quality, test coverage, spec compliance, API design, error handling, naming conventions
-- **Operations reviews:** Safety, rollback plan exists, monitoring in place, blast radius contained, gradual rollout, secret management
-- **Maintenance reviews:** Regression risk, backward compatibility, documentation updated, test coverage maintained, no behavior changes unless intended
+#### `code-quality-principles.md`
 
-### 6.2 `code-quality-principles.md`
-Standards for code quality across all skills:
-- Single responsibility per file/function
-- Well-defined interfaces
-- Testable independently
-- Follow existing codebase patterns
-- YAGNI (no speculative features)
-- DRY (extract only after 3+ repetitions)
+- file boundaries
+- interface clarity
+- follow existing code patterns
+- avoid speculative features
 
-### 6.3 `ops-checklists.md`
-Pre-flight checklists for operations:
-- Deployment checklist (tests pass, rollback plan, monitoring, communication)
-- Incident response checklist (classify, investigate, communicate, resolve, post-mortem)
-- Infrastructure change checklist (dry-run, review, apply, verify)
+#### `tdd-principles.md`
 
-### 6.4 `security-baselines.md`
-Security standards:
-- OWASP Top 10 awareness
-- Secret management (no secrets in code, use env vars or vaults)
-- Dependency vulnerability thresholds
-- Input validation requirements
-- Authentication/authorization patterns
+- RED -> GREEN -> REFACTOR
+- anti-patterns
+- acceptable mocking guidance
 
-### 6.5 `tdd-principles.md`
-TDD guidelines shared by development and maintenance skills:
-- RED-GREEN-REFACTOR cycle
-- Testing anti-patterns
-- When mocks are acceptable (external services only)
-- Test naming conventions
-- Coverage expectations
+#### `deploy-safety-checklist.md`
 
----
+- target environment confirmed
+- rollback documented
+- blast radius understood
+- validation checks prepared
+- post-deploy monitor window defined
 
-## 7. Support Scripts
+#### `review-profiles/`
 
-### 7.1 `install.sh`
-```bash
-#!/bin/bash
-# Install CCCXDevOps skills to ~/.claude/skills/
-# Usage: bash install.sh [--with-scripts]
-```
-- Copies `skills/cccx-*` and `skills/shared-references` to `~/.claude/skills/`
-- Optionally copies `scripts/*` to `~/.claude/scripts/`
-- Checks for Codex MCP setup, prompts if not configured
-- Idempotent (safe to run multiple times)
+Each profile defines:
 
-### 7.2 `health-check.sh`
-```bash
-#!/bin/bash
-# Generic health check runner
-# Usage: bash health-check.sh <target> [--timeout 30]
-```
-- HTTP endpoint probing
-- Process health checks
-- Resource utilization checks
-- Used by `cccx-monitor` and `cccx-deploy` (post-deployment verification)
+- review intent
+- required evidence
+- profile-specific questions
+- approval thresholds
 
-### 7.3 `state-manager.sh`
-```bash
-#!/bin/bash
-# State file management for long-running workflows
-# Usage: bash state-manager.sh read|write|reset <state-file>
-```
-- Read/write JSON state files
-- State files: `PIPELINE_STATE.json`, `REVIEW_STATE.json`, `DEPLOY_STATE.json`
-- Supports session recovery for interrupted workflows
+### 9.2 Templates
+
+#### `FEATURE_BRIEF.md`
+
+For brainstorming and planning.
+
+#### `SERVICE_PROFILE.md`
+
+Required for ops pilot. Includes:
+
+- service name
+- environments
+- health endpoints
+- deploy command or deploy script entrypoint
+- rollback command or documented rollback steps
+- critical dashboards/log locations
+
+#### `DEPLOYMENT_PLAN.md`
+
+Used by `cccx-deploy` when the project does not already provide a suitable plan document.
 
 ---
 
-## 8. Development Phases
+## 10. Support Scripts
 
-### Phase 1: Foundation (skeleton + infrastructure)
-**Goal:** Establish directory structure, installation mechanism, shared references, and the Codex integration pattern that all skills will use.
+### 10.1 `install.sh`
 
-**Deliverables:**
-- [ ] Directory structure created
-- [ ] `scripts/install.sh` -- installation helper
-- [ ] `shared-references/codex-review-criteria.md` -- Codex review criteria
-- [ ] `shared-references/code-quality-principles.md` -- quality standards
-- [ ] `shared-references/tdd-principles.md` -- TDD guidelines
-- [ ] `templates/FEATURE_BRIEF.md` -- feature request template
-- [ ] Updated `CLAUDE.md` with CCCXDevOps skill loading instructions
-- [ ] `docs/INSTALLATION.md` -- installation guide
-- [ ] `README.md` -- project overview
+Responsibilities:
 
-**Verification:** `install.sh` successfully copies skills to `~/.claude/skills/`, Codex MCP connectivity confirmed.
+- copy `skills/cccx-*` to `~/.claude/skills/`
+- copy `skills/shared-references` to `~/.claude/skills/`
+- optionally copy scripts to `~/.claude/scripts/`
+- print Codex MCP setup steps if not already configured
 
----
+### 10.2 `health-check.sh`
 
-### Phase 2: Core Development Skills (the foundation skills)
-**Goal:** Build the discipline skills and core development workflow. These are the most well-defined skills (adapted from superpowers) and form the foundation everything else builds on.
+Responsibilities:
 
-**Deliverables (order matters -- dependencies flow downward):**
-- [ ] `cccx-tdd/SKILL.md` -- TDD discipline (used by all implementation skills)
-- [ ] `cccx-verify/SKILL.md` -- verification discipline (used by all completion claims)
-- [ ] `cccx-review/SKILL.md` -- Codex MCP review (used by all Codex checkpoints)
-- [ ] `cccx-brainstorm/SKILL.md` -- design exploration
-- [ ] `cccx-plan/SKILL.md` -- implementation planning
-- [ ] `cccx-worktree/SKILL.md` -- git worktree management
-- [ ] `cccx-implement/SKILL.md` + subagent prompts -- subagent-driven implementation
-- [ ] `cccx-debug/SKILL.md` + supporting docs -- systematic debugging
-- [ ] `cccx-finish/SKILL.md` -- branch completion
-- [ ] `cccx-dev-pipeline/SKILL.md` -- full development pipeline
+- HTTP probes
+- process checks
+- basic timeout handling
+- consistent output format for `cccx-monitor`
 
-**Verification:** Run a small feature development end-to-end using `cccx-dev-pipeline`. Confirm Codex reviews occur at each gate. Confirm TDD discipline is enforced.
+### 10.3 `review-context.sh`
+
+Responsibilities:
+
+- gather the exact evidence bundle for `cccx-review`
+- support at least:
+  - design doc review context
+  - implementation plan review context
+  - git diff review context
+  - deploy plan review context
+
+This script exists to make review inputs consistent and testable.
 
 ---
 
-### Phase 3: Operations Skills
-**Goal:** Build the operations workflow skills for deployment, monitoring, incident response, CI/CD, and infrastructure.
+## 11. Testing Strategy
 
-**Deliverables:**
-- [ ] `shared-references/ops-checklists.md` -- operations checklists
-- [ ] `templates/DEPLOYMENT_PLAN.md` -- deployment plan template
-- [ ] `templates/INCIDENT_REPORT.md` -- incident report template
-- [ ] `cccx-deploy/SKILL.md` -- deployment management
-- [ ] `cccx-monitor/SKILL.md` -- health monitoring
-- [ ] `cccx-incident/SKILL.md` -- incident response
-- [ ] `cccx-ci-cd/SKILL.md` -- CI/CD pipeline management
-- [ ] `cccx-infra/SKILL.md` -- infrastructure management
-- [ ] `cccx-ops-pipeline/SKILL.md` -- full operations pipeline
-- [ ] `scripts/health-check.sh` -- health check runner
+### 11.1 Principle
 
-**Verification:** Simulate a deployment + monitoring workflow. Confirm Codex reviews deployment plan before execution. Confirm rollback plan is enforced.
+Skill testing is part of the product, not an afterthought.
 
----
+v1 should not be considered complete unless the skills are tested in the same style that made the reference repos reliable.
 
-### Phase 4: Maintenance Skills
-**Goal:** Build the maintenance workflow skills for dependency management, security, performance, tech debt, and documentation.
+### 11.2 Test Layers
 
-**Deliverables:**
-- [ ] `shared-references/security-baselines.md` -- security standards
-- [ ] `templates/MAINTENANCE_REQUEST.md` -- maintenance request template
-- [ ] `cccx-deps/SKILL.md` -- dependency management
-- [ ] `cccx-security/SKILL.md` -- security assessment
-- [ ] `cccx-perf/SKILL.md` -- performance audit
-- [ ] `cccx-tech-debt/SKILL.md` -- technical debt management
-- [ ] `cccx-docs/SKILL.md` -- documentation maintenance
-- [ ] `cccx-maint-pipeline/SKILL.md` -- full maintenance pipeline
+#### A. Trigger Tests
 
-**Verification:** Run maintenance sweep on a sample project. Confirm each step produces actionable output. Confirm Codex reviews at each gate.
+Directory:
 
----
+- `tests/skill-triggering/`
 
-### Phase 5: Integration & Meta Skills
-**Goal:** Build the cross-cutting orchestrator, parallel dispatch, and skill-creation meta-skill. End-to-end testing of the full framework.
+Purpose:
 
-**Deliverables:**
-- [ ] `cccx-pipeline/SKILL.md` -- full DevOps orchestrator
-- [ ] `cccx-parallel/SKILL.md` -- parallel agent dispatch
-- [ ] `cccx-writing-skills/SKILL.md` -- skill creation meta-skill
-- [ ] `scripts/state-manager.sh` -- state file management
-- [ ] `docs/SKILL_CATALOG.md` -- full skill reference documentation
-- [ ] End-to-end test: `cccx-pipeline` for a feature (dev -> deploy -> maintain)
+- verify that natural prompts trigger the right skills in Claude Code
 
-**Verification:** Full pipeline test across all three domains. Confirm state persistence and session recovery. Confirm all Codex review points function correctly.
+Examples:
 
----
+- feature request triggers `cccx-brainstorm`
+- bug report triggers `cccx-debug`
+- implementation request with approved plan triggers `cccx-implement`
 
-## 9. Testing Strategy
+#### B. Skill Content Tests
 
-### 9.1 Skill Testing (TDD for Documentation)
+Directory:
 
-Following superpowers' approach: **test skills with pressure scenarios**.
+- `tests/claude-code/`
 
-For each skill:
-1. **Baseline (RED):** Run scenario WITHOUT the skill loaded. Document agent behavior -- where does it cut corners?
-2. **With Skill (GREEN):** Run same scenario WITH skill. Agent should now follow the discipline.
-3. **Loophole Test (REFACTOR):** Try to find rationalizations that bypass the skill. Close them.
+Purpose:
 
-### 9.2 Integration Testing
+- verify that Claude can describe required workflow ordering and hard rules
 
-For each pipeline skill:
-1. Run the full chain on a small sample project
-2. Verify each checkpoint is hit
-3. Verify Codex reviews occur (mock Codex if needed for CI)
-4. Verify state persistence works across session interruptions
+Examples:
 
-### 9.3 Codex Review of This Plan
+- brainstorming requires approval before implementation
+- implementation review order is spec first, then code quality
+- `cccx-review` is the only direct MCP owner
 
-This plan itself should be reviewed by Codex for:
-- **Completeness:** Are all DevOps scenarios covered?
-- **Consistency:** Do skills reference each other correctly?
-- **Feasibility:** Is the scope realistic? Are phases well-ordered?
-- **Gaps:** Any missing skills, shared references, or templates?
-- **Naming:** Is the `cccx-` prefix consistently applied?
-- **Iron Laws:** Are discipline rules strong enough? Any missing guardrails?
+#### C. Mocked Review Tests
 
----
+Directory:
 
-## 10. Open Questions for Codex Review
+- `tests/mocks/`
 
-1. **Scope granularity for ops skills:** Should `cccx-deploy` support all deployment strategies (rolling, blue-green, canary) in one skill, or should these be separate skills?
+Purpose:
 
-2. **Codex review depth:** Should every skill have a mandatory Codex checkpoint, or should some lightweight skills (e.g., `cccx-worktree`, `cccx-docs`) skip Codex review to reduce latency?
+- validate `cccx-review` behavior without requiring live Codex
 
-3. **State persistence format:** JSON files (like ARIS) or Markdown files (more human-readable)? Or both (JSON for machine, Markdown summary for humans)?
+Examples:
 
-4. **Notification integration:** Should CCCXDevOps include notification support (Slack, Feishu, email) for long-running operations? ARIS has Feishu integration. Is this in scope?
+- `APPROVE` path
+- `REQUEST_CHANGES` path
+- `BLOCK` path
+- thread-follow-up path
 
-5. **Multi-platform support:** Should skills support Codex-native versions (like ARIS's `skills-codex/` overlay)? Or keep it Claude Code-only for v1?
+#### D. Integration Tests
 
-6. **Skill dependencies:** Should skills explicitly declare dependencies on other skills (e.g., `cccx-implement` depends on `cccx-tdd`)? Or keep it implicit in the workflow descriptions?
+Directory:
+
+- `tests/fixtures/`
+
+Purpose:
+
+- run a small development workflow end-to-end on a fixture project
+
+Minimum fixture:
+
+- one small repo
+- failing test to drive implementation
+- enough structure to validate worktree, plan, implementation, review, and finish flow
+
+### 11.3 Live Review Smoke Test
+
+Real Codex review should be optional in automation:
+
+- mocked review is required in CI
+- live Codex smoke test runs only when an environment flag is present
+
+Suggested flag:
+
+- `LIVE_CODEX=1`
+
+### 11.4 Required v1 Test Deliverables
+
+- at least 3 trigger tests
+- at least 5 skill-content tests
+- mocked review path tests for all verdict types
+- 1 end-to-end dev workflow fixture
 
 ---
 
-## 11. Success Criteria
+## 12. Development Phases
 
-The framework is successful when:
+### Phase 1: Foundation and Validation Harness
 
-1. **A user can `cp -r` install and immediately use any skill** -- no configuration beyond Codex MCP setup
-2. **Codex catches issues that Claude Code misses** -- demonstrable review value at each checkpoint
-3. **TDD discipline is enforced** -- no production code without failing test, verified in practice
-4. **All three domains work** -- Development, Operations, and Maintenance workflows produce reliable results
-5. **Skills compose naturally** -- Run the full pipeline or any individual skill independently
-6. **State survives interruptions** -- Long-running workflows can resume after context window limits or session breaks
-7. **New skills are easy to create** -- The `cccx-writing-skills` meta-skill enables framework extension
+Goal:
+
+- establish the Claude host layer, review foundation, and tests first
+
+Deliverables:
+
+- [ ] `cccx-using-devops/SKILL.md`
+- [ ] `scripts/install.sh`
+- [ ] `scripts/review-context.sh`
+- [ ] `templates/FEATURE_BRIEF.md`
+- [ ] `templates/SERVICE_PROFILE.md`
+- [ ] `templates/DEPLOYMENT_PLAN.md`
+- [ ] `shared-references/code-quality-principles.md`
+- [ ] `shared-references/tdd-principles.md`
+- [ ] `shared-references/deploy-safety-checklist.md`
+- [ ] `shared-references/review-profiles/dev-design.md`
+- [ ] `shared-references/review-profiles/dev-plan.md`
+- [ ] `shared-references/review-profiles/dev-implementation.md`
+- [ ] `shared-references/review-profiles/deploy-safety.md`
+- [ ] `tests/skill-triggering/` harness
+- [ ] `tests/claude-code/` harness
+- [ ] `tests/mocks/` review harness
+- [ ] `docs/INSTALLATION.md`
+- [ ] `README.md`
+
+Verification:
+
+- install flow works in Claude Code
+- bootstrap skill loads and enforces skill-first behavior
+- trigger tests can detect missing skill activation
+
+### Phase 2: Review Layer and Core Discipline Skills
+
+Goal:
+
+- implement the review gateway and the strict workflow skills it depends on
+
+Deliverables:
+
+- [ ] `cccx-review/SKILL.md`
+- [ ] `cccx-tdd/SKILL.md`
+- [ ] `cccx-verify/SKILL.md`
+- [ ] `cccx-debug/SKILL.md`
+- [ ] `cccx-worktree/SKILL.md`
+- [ ] `scripts/health-check.sh`
+
+Verification:
+
+- mocked review tests cover all verdict paths
+- `cccx-review` can assemble context bundles by profile
+- discipline skills are testable in isolation
+
+### Phase 3: Development Workflow
+
+Goal:
+
+- ship the full development vertical slice
+
+Deliverables:
+
+- [ ] `cccx-brainstorm/SKILL.md`
+- [ ] `cccx-plan/SKILL.md`
+- [ ] `cccx-implement/SKILL.md`
+- [ ] `cccx-implement/implementer-prompt.md`
+- [ ] `cccx-implement/spec-reviewer-prompt.md`
+- [ ] `cccx-implement/code-quality-reviewer-prompt.md`
+- [ ] `cccx-finish/SKILL.md`
+- [ ] `cccx-dev-pipeline/SKILL.md`
+- [ ] fixture project + end-to-end development integration test
+
+Verification:
+
+- small feature can be taken from design to finished branch
+- review gates fire at the declared checkpoints
+- TDD discipline is preserved in actual execution
+
+### Phase 4: Operations Pilot
+
+Goal:
+
+- add one safe, configuration-driven ops slice
+
+Deliverables:
+
+- [ ] `cccx-deploy/SKILL.md`
+- [ ] `cccx-monitor/SKILL.md`
+- [ ] deploy + monitor fixture or scripted demo target
+- [ ] tests for service-profile validation and deploy safety review path
+
+Verification:
+
+- deployment does not proceed without rollback information
+- monitor can verify the target using `SERVICE_PROFILE.md`
+- deploy safety review blocks unsafe plans
+
+### Phase 5: Review and Expansion Gate
+
+Goal:
+
+- decide whether the v1 slice is strong enough to justify more ops and maintenance work
+
+Exit criteria before adding more skills:
+
+- development workflow is reliable in repeated tests
+- review gateway is stable
+- ops pilot is useful and does not create false confidence
+- Claude Code and Codex roles are clear in practice
+
+Deferred backlog after Phase 5:
+
+- incident response
+- CI/CD management
+- infrastructure changes
+- maintenance pipeline
+- session recovery/state files
+- notifications
+- broader orchestrators
 
 ---
 
-## Appendix A: Skill Count Summary
+## 13. Open Questions for Claude Code Review
 
-| Domain | Skills | Pipeline |
-|--------|--------|----------|
-| Development | 10 | `cccx-dev-pipeline` |
-| Operations | 6 | `cccx-ops-pipeline` |
-| Maintenance | 6 | `cccx-maint-pipeline` |
-| Cross-cutting | 3 | `cccx-pipeline` |
-| **Total** | **25** | |
+1. Is `cccx-review` as the single direct MCP owner the right abstraction, or is there a simpler boundary that still prevents review logic duplication?
+2. Is the v1 scope still too large, or is the current vertical slice small enough to validate the framework?
+3. Is `review-context.sh` worth keeping as a script, or should evidence collection remain inside skill instructions?
+4. Are the mandatory review gates correctly chosen, or should any of them move from mandatory to optional?
+5. Are the ops pilot guardrails strict enough for deploy work without making the skill useless?
 
-## Appendix B: Codex Review Checkpoints Summary
+---
 
-| Skill | Review Focus | Effort Level |
-|-------|-------------|--------------|
-| `cccx-brainstorm` | Design completeness, ambiguity, risks | high |
-| `cccx-plan` | Plan completeness, task granularity, missing edges | high |
-| `cccx-implement` | Architectural coherence across all tasks | xhigh |
-| `cccx-finish` | Final diff review, merge readiness | high |
-| `cccx-deploy` | Safety, rollback plan, blast radius | xhigh |
-| `cccx-incident` | Post-mortem completeness, action items | high |
-| `cccx-ci-cd` | Pipeline security, efficiency, correctness | high |
-| `cccx-infra` | Security, cost, reliability | xhigh |
-| `cccx-deps` | Update risk assessment accuracy | high |
-| `cccx-security` | Findings completeness, remediation plan | xhigh |
-| `cccx-perf` | Optimization correctness, regression risk | high |
-| `cccx-tech-debt` | Refactoring plan regression risk | high |
-| `cccx-docs` | Documentation accuracy | medium |
+## 14. Success Criteria for v1
 
-## Appendix C: Reference Mapping
+CCCXDevOps v1 is successful when:
 
-| CCCXDevOps Skill | Primary Source | Adaptation |
-|-----------------|----------------|------------|
-| `cccx-brainstorm` | superpowers/brainstorming | + Codex checkpoint |
-| `cccx-plan` | superpowers/writing-plans | + Codex checkpoint |
-| `cccx-tdd` | superpowers/test-driven-development | Minimal changes |
-| `cccx-implement` | superpowers/subagent-driven-dev | + Codex MCP review |
-| `cccx-review` | ARIS Codex MCP pattern | + superpowers review format |
-| `cccx-debug` | superpowers/systematic-debugging | + Codex consultation |
-| `cccx-verify` | superpowers/verification-before-completion | Minimal changes |
-| `cccx-worktree` | superpowers/using-git-worktrees | Simplified |
-| `cccx-finish` | superpowers/finishing-a-dev-branch | + Codex final review |
-| `cccx-parallel` | superpowers/dispatching-parallel-agents | Renamed with prefix |
-| `cccx-writing-skills` | superpowers/writing-skills | Renamed with prefix |
-| `cccx-deploy` | **New** | DevOps-specific |
-| `cccx-monitor` | **New** | DevOps-specific |
-| `cccx-incident` | **New** | DevOps-specific |
-| `cccx-ci-cd` | **New** | DevOps-specific |
-| `cccx-infra` | **New** | DevOps-specific |
-| `cccx-deps` | **New** | DevOps-specific |
-| `cccx-security` | **New** | DevOps-specific |
-| `cccx-perf` | **New** | DevOps-specific |
-| `cccx-tech-debt` | **New** | DevOps-specific |
-| `cccx-docs` | **New** | DevOps-specific |
+1. Claude Code can install the skills with a simple documented flow
+2. `cccx-using-devops` causes the right process skills to activate before action
+3. The development workflow works end-to-end on a fixture project
+4. `cccx-review` consistently handles approve, request-changes, and block paths
+5. Codex review catches at least one seeded issue in test fixtures
+6. `cccx-deploy` refuses to act without explicit rollback and environment context
+7. The repository includes real trigger/content/integration tests, not just prose about testing
+
+---
+
+## 15. Summary of What Changed from v1
+
+- Host scope is now explicitly **Claude Code only**
+- The plan now has a **logical layer split** without becoming a cross-platform project
+- **Generic Codex review framework is kept**, but direct MCP calls are centralized in `cccx-review`
+- A bootstrap skill, `cccx-using-devops`, is added
+- v1 scope is reduced to **development workflow + deploy/monitor ops pilot**
+- Maintenance and broad ops automation are deferred
+- Testing is moved into **Phase 1**
+- Ops skills now require explicit project configuration instead of implying zero-config safety
+- Review output is changed from mandatory numeric scoring to a more generic **verdict + risk** contract
+
