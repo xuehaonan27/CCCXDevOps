@@ -42,7 +42,7 @@ Request final diff review through `cccx-review`:
 3. Invoke `cccx-review`
 4. Handle the verdict:
    - APPROVE: proceed to Step 3
-   - REQUEST_CHANGES: address issues, re-submit
+   - REQUEST_CHANGES: address the issues, then re-submit by writing a new `.cccx/review/REVIEW_REQUEST.md` with the `threadId` from the previous `REVIEW_RESPONSE.md` and a "Changes Since Last Review" section describing what was fixed. Invoke `cccx-review` again.
    - BLOCK: present to user, do not offer merge options
    - SKIPPED (Codex not configured): warn user that external review was not performed, then proceed to Step 3
 

@@ -32,6 +32,8 @@ usage() {
     echo "  --head-sha SHA      Head commit for diff (dev-implementation)"
     echo "  --service-profile PATH  Path to SERVICE_PROFILE.md (deploy-safety)"
     echo "  --deploy-plan PATH  Path to deployment plan (deploy-safety)"
+    echo "  --thread-id ID      Thread ID from previous REVIEW_RESPONSE.md (follow-up reviews)"
+    echo "  --changes TEXT      Description of changes since last review (follow-up reviews)"
     exit 1
 }
 
@@ -48,6 +50,8 @@ BASE_SHA=""
 HEAD_SHA=""
 SERVICE_PROFILE=""
 DEPLOY_PLAN=""
+THREAD_ID=""
+CHANGES_DESCRIPTION=""
 
 shift
 shift 2>/dev/null || true
@@ -60,19 +64,34 @@ while [ $# -gt 0 ]; do
         --head-sha) HEAD_SHA="$2"; shift 2 ;;
         --service-profile) SERVICE_PROFILE="$2"; shift 2 ;;
         --deploy-plan) DEPLOY_PLAN="$2"; shift 2 ;;
+        --thread-id) THREAD_ID="$2"; shift 2 ;;
+        --changes) CHANGES_DESCRIPTION="$2"; shift 2 ;;
         *) SUBJECT="$1"; shift ;;
     esac
 done
 
 write_header() {
-    cat > "$REVIEW_DIR/REVIEW_REQUEST.md" <<EOF
----
-profile: $PROFILE
-subject: $SUBJECT
-timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
----
+    {
+        echo "---"
+        echo "profile: $PROFILE"
+        echo "subject: $SUBJECT"
+        if [ -n "$THREAD_ID" ]; then
+            echo "threadId: $THREAD_ID"
+        fi
+        echo "timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        echo "---"
+        echo ""
+    } > "$REVIEW_DIR/REVIEW_REQUEST.md"
+}
 
-EOF
+append_changes_section() {
+    if [ -n "$CHANGES_DESCRIPTION" ]; then
+        {
+            echo ""
+            echo "## Changes Since Last Review"
+            echo "$CHANGES_DESCRIPTION"
+        } >> "$REVIEW_DIR/REVIEW_REQUEST.md"
+    fi
 }
 
 gather_dev_design() {
@@ -102,6 +121,7 @@ gather_dev_design() {
         echo "- Are there ambiguous requirements that need clarification?"
         echo "- What risks or missing considerations should be addressed?"
     } >> "$REVIEW_DIR/REVIEW_REQUEST.md"
+    append_changes_section
 }
 
 gather_dev_plan() {
@@ -132,6 +152,7 @@ gather_dev_plan() {
         echo "- Are all file paths, commands, and code complete?"
         echo "- Are edge cases covered?"
     } >> "$REVIEW_DIR/REVIEW_REQUEST.md"
+    append_changes_section
 }
 
 gather_dev_implementation() {
@@ -168,6 +189,7 @@ gather_dev_implementation() {
         echo "- Are there code quality issues?"
         echo "- Is the implementation architecturally coherent?"
     } >> "$REVIEW_DIR/REVIEW_REQUEST.md"
+    append_changes_section
 }
 
 gather_deploy_safety() {
@@ -206,6 +228,7 @@ gather_deploy_safety() {
         echo "- Are post-deployment validation commands defined?"
         echo "- Is monitoring in place for the deploy window?"
     } >> "$REVIEW_DIR/REVIEW_REQUEST.md"
+    append_changes_section
 }
 
 case "$PROFILE" in

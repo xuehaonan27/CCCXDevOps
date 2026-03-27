@@ -65,7 +65,7 @@ Request Codex review through `cccx-review`:
 
 3. Handle verdict:
    - APPROVE: proceed to Phase 3
-   - REQUEST_CHANGES: address issues, re-submit
+   - REQUEST_CHANGES: address the issues, then re-submit by writing a new `.cccx/review/REVIEW_REQUEST.md` with the `threadId` from the previous `REVIEW_RESPONSE.md` and a "Changes Since Last Review" section describing what was fixed. Invoke `cccx-review` again.
    - BLOCK: STOP. Present to user. Do not proceed.
    - SKIPPED (Codex not configured): warn user that deploy safety review was not performed. For **production** deployments, STOP and require explicit user acknowledgment before proceeding without review. For non-production, proceed with warning.
 
