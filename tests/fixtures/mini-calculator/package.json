@@ -1,0 +1,11 @@
+{
+  "name": "mini-calculator",
+  "version": "1.0.0",
+  "description": "Minimal calculator for CCCXDevOps integration testing",
+  "main": "src/calculator.js",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": [],
+  "license": "MIT"
+}
