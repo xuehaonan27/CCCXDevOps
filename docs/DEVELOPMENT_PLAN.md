@@ -158,7 +158,19 @@ But they do so by invoking `cccx-review` with:
 
 This prevents review logic from being duplicated across the repository.
 
-### 4.3 Repository Structure
+### 4.3 Skill Chaining Rule
+
+Pipeline skills must invoke sub-skills through the Claude Code `Skill` tool.
+
+They must not copy a child skill's workflow inline into the parent skill body.
+
+Benefits:
+
+- sub-skills remain independently updateable
+- invocation chains are visible in logs and tests
+- workflow logic does not drift across duplicate copies
+
+### 4.4 Repository Structure
 
 ```text
 CCCXDevOps/
@@ -331,7 +343,32 @@ Every review request should supply:
 - `constraints`: rollout limits, no-downtime requirement, branch rules, etc.
 - `questions`: optional focal questions for Codex
 
-### 6.4 Review Response Contract
+### 6.4 Request Handoff Mechanism
+
+v1 will use a file-based handoff between calling skills and `cccx-review`.
+
+Suggested runtime artifacts:
+
+- `.cccx/review/REVIEW_REQUEST.md`
+- `.cccx/review/REVIEW_RESPONSE.md`
+
+Flow:
+
+1. calling skill gathers evidence
+2. calling skill or `review-context.sh` writes `REVIEW_REQUEST.md`
+3. `cccx-review` reads the request file
+4. `cccx-review` assembles the Codex prompt and calls MCP
+5. `cccx-review` writes `REVIEW_RESPONSE.md`
+6. calling skill reads the response and decides whether to proceed
+
+Why this is the v1 choice:
+
+- inspectable by humans
+- easy to test
+- easy to diff
+- avoids oversized argument strings
+
+### 6.5 Review Response Contract
 
 v1 will use a risk-oriented schema instead of a mandatory score:
 
@@ -344,7 +381,7 @@ v1 will use a risk-oriented schema instead of a mandatory score:
 
 Scores may be added by a specific profile if that domain benefits from them, but scores are not part of the universal contract.
 
-### 6.5 Thread Handling
+### 6.6 Thread Handling
 
 Base behavior:
 
@@ -353,7 +390,7 @@ Base behavior:
 3. `cccx-review` stores the thread id in the immediate workflow context
 4. No other skill needs to know transport details
 
-### 6.6 Large Review Handling
+### 6.7 Large Review Handling
 
 For long inputs, `cccx-review` must prefer:
 
@@ -364,14 +401,14 @@ For long inputs, `cccx-review` must prefer:
 
 If async review support is needed later, that change should stay inside `cccx-review`.
 
-### 6.7 Review Profiles in v1
+### 6.8 Review Profiles in v1
 
 - `dev-design`
 - `dev-plan`
 - `dev-implementation`
 - `deploy-safety`
 
-### 6.8 Future-Proofing for Kubernetes Maintenance
+### 6.9 Future-Proofing for Kubernetes Maintenance
 
 The generic framework is intentionally suitable for future profiles such as `k8s-maintenance`, where the required evidence would include:
 
@@ -453,6 +490,12 @@ Hard rules:
 - brainstorming before new development
 - debugging before speculative fixes
 - review checkpoints are mandatory when a workflow declares them
+
+Activation for v1:
+
+- `install.sh` must print a `CLAUDE.md` snippet that tells Claude Code to invoke `cccx-using-devops` at session start
+- if the user allows it, `install.sh` may also append that snippet automatically
+- hook-based auto-start is deferred to a later version
 
 ### 8.2 `cccx-brainstorm`
 
@@ -622,6 +665,11 @@ Mandatory external review gates:
 - final implementation
 - final branch diff
 
+Execution rule:
+
+- `cccx-dev-pipeline` invokes each sub-skill through the `Skill` tool
+- it must not inline sub-skill workflows into its own body
+
 ### 8.12 `cccx-deploy` (Ops Pilot)
 
 Purpose:
@@ -721,6 +769,7 @@ Required for ops pilot. Includes:
 - health endpoints
 - deploy command or deploy script entrypoint
 - rollback command or documented rollback steps
+- validation commands
 - critical dashboards/log locations
 
 #### `DEPLOYMENT_PLAN.md`
@@ -783,6 +832,12 @@ Directory:
 Purpose:
 
 - verify that natural prompts trigger the right skills in Claude Code
+
+v1 mechanism:
+
+- manual prompt + expected-skill pairs stored as Markdown test cases
+- a human or simple harness runs Claude Code against those prompts
+- full automated trigger testing is deferred until a reliable automation path exists
 
 Examples:
 
@@ -1018,4 +1073,3 @@ CCCXDevOps v1 is successful when:
 - Testing is moved into **Phase 1**
 - Ops skills now require explicit project configuration instead of implying zero-config safety
 - Review output is changed from mandatory numeric scoring to a more generic **verdict + risk** contract
-
