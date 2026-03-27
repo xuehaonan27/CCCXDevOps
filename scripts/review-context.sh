@@ -13,7 +13,7 @@
 set -euo pipefail
 
 PROFILE="${1:-}"
-SUBJECT="${2:-}"
+SUBJECT=""
 REVIEW_DIR=".cccx/review"
 
 usage() {
@@ -53,8 +53,8 @@ DEPLOY_PLAN=""
 THREAD_ID=""
 CHANGES_DESCRIPTION=""
 
+# Shift past profile, then parse remaining args in the loop
 shift
-shift 2>/dev/null || true
 
 while [ $# -gt 0 ]; do
     case "$1" in

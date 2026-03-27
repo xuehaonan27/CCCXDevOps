@@ -92,6 +92,18 @@ for profile in dev-plan dev-implementation deploy-safety; do
         fail "$profile request file not created"
     fi
 done
+
+# Regression: flags-only call (no subject arg) must not mangle flags
+rm -f .cccx/review/REVIEW_REQUEST.md
+mkdir -p docs/cccx/plans
+echo "# Test Plan" > docs/cccx/plans/test-plan.md
+bash "$REPO_DIR/scripts/review-context.sh" dev-plan \
+    --plan-doc docs/cccx/plans/test-plan.md > /dev/null 2>&1
+if grep -q "# Test Plan" .cccx/review/REVIEW_REQUEST.md 2>/dev/null; then
+    pass "flags-only call: --plan-doc content included"
+else
+    fail "flags-only call: --plan-doc content missing (parser mangled flags)"
+fi
 echo ""
 
 # ---------- Test 2: APPROVE response structure ----------
