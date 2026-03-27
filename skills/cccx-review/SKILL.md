@@ -22,9 +22,41 @@ Central review gateway for all CCCXDevOps workflows. Only this skill directly in
 
 1. Read `.cccx/review/REVIEW_REQUEST.md`
 2. Verify it contains: profile, subject, goal, context, evidence
-3. If the file is missing or incomplete, ask the calling workflow to provide it
+3. Check for `threadId` in the request frontmatter:
+   - If present: this is a **follow-up** review (REQUEST_CHANGES -> fix -> re-submit). Use `mcp__codex__codex-reply` in Phase 4.
+   - If absent: this is a **first** review. Use `mcp__codex__codex` in Phase 4.
+4. If the file is missing or incomplete, ask the calling workflow to provide it
 
 If no REVIEW_REQUEST.md exists but the caller provided context inline, create one from the provided information.
+
+**Request file schema:**
+
+```markdown
+---
+profile: <profile-name>
+subject: <what is being reviewed>
+threadId: <from previous REVIEW_RESPONSE.md, or omit for first review>
+timestamp: <ISO 8601>
+---
+
+## Goal
+<what the actor is trying to accomplish>
+
+## Context
+<bounded, relevant background>
+
+## Evidence
+<commands, diffs, logs, test output>
+
+## Constraints
+<rollout limits, branch rules, etc.>
+
+## Questions
+<optional focal questions for Codex>
+
+## Changes Since Last Review
+<only for follow-up reviews: what was fixed since the last round>
+```
 
 ### Phase 2: Load the Review Profile
 
@@ -55,14 +87,14 @@ Respond using this structure:
 
 ### Phase 4: Call Codex MCP
 
-**First review in this workflow:**
+**First review (no threadId in request):**
 - Use `mcp__codex__codex` with config `{"model_reasoning_effort": "high"}`
 - For deploy-safety or dev-implementation profiles, use `{"model_reasoning_effort": "xhigh"}`
-- Save the returned `threadId`
+- Save the returned `threadId` -- it will be written to REVIEW_RESPONSE.md
 
-**Follow-up review (after changes):**
-- Use `mcp__codex__codex-reply` with the saved `threadId`
-- Include what changed since the last review
+**Follow-up review (threadId present in request):**
+- Use `mcp__codex__codex-reply` with the `threadId` from the request
+- Include the "Changes Since Last Review" section from the request
 
 **If Codex MCP is not available:**
 - Write `.cccx/review/REVIEW_RESPONSE.md` with verdict `SKIPPED`
@@ -80,6 +112,8 @@ Respond using this structure:
 verdict: APPROVE | REQUEST_CHANGES | BLOCK | SKIPPED
 risk: LOW | MEDIUM | HIGH | CRITICAL | UNKNOWN
 profile: <profile-name>
+threadId: <from Codex MCP response, or "none" if SKIPPED>
+round: <1, 2, 3, ...>
 timestamp: <ISO 8601>
 ---
 
@@ -102,16 +136,21 @@ timestamp: <ISO 8601>
 ### Phase 6: Report to Calling Workflow
 
 - **APPROVE**: Report approval. Calling workflow proceeds.
-- **REQUEST_CHANGES**: Report issues. Calling workflow addresses them, then re-submits (back to Phase 1 with updated request).
+- **REQUEST_CHANGES**: Report issues. The calling workflow should:
+  1. Address the issues
+  2. Write a new REVIEW_REQUEST.md with:
+     - `threadId` copied from the previous REVIEW_RESPONSE.md
+     - A "Changes Since Last Review" section describing what was fixed
+  3. Re-invoke `cccx-review` (which will use `mcp__codex__codex-reply` because threadId is present)
 - **BLOCK**: Report blockers. STOP. Present to user. Do not auto-proceed.
 - **SKIPPED**: Report that external review was not performed. Calling workflow proceeds with a visible warning to the user.
 
 ### Retry Policy
 
-- Max 3 review rounds per checkpoint
-- If still REQUEST_CHANGES after 3 rounds: escalate to human
+- Max 3 review rounds per checkpoint (tracked via `round` field in REVIEW_RESPONSE.md)
+- If still REQUEST_CHANGES after round 3: escalate to human
 - If BLOCK at any round: immediate human escalation
-- Each round uses `mcp__codex__codex-reply` to maintain thread context
+- Thread continuity is maintained via threadId in the request/response files
 
 ---
 

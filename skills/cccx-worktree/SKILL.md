@@ -45,8 +45,9 @@ git check-ignore -q .worktrees 2>/dev/null
 
 If NOT ignored:
 1. Add `.worktrees/` (or `worktrees/`) to `.gitignore`
-2. Commit the change: `git add .gitignore && git commit -m "chore: ignore worktree directory"`
-3. Proceed
+2. Do **NOT** commit this change yet -- `.gitignore` takes effect from the working tree regardless of commit state. Committing would mutate the current branch (likely main) before isolation exists.
+3. Proceed to Step 3. The `.gitignore` change will be picked up automatically.
+4. Note for the user: "Added .worktrees/ to .gitignore (uncommitted). You may want to commit this separately."
 
 ### Step 3: Create Worktree
 
@@ -106,6 +107,7 @@ git worktree remove <worktree-path>
 ## Red Flags
 
 - Creating a worktree without verifying .gitignore
+- Committing .gitignore changes to main/master before the feature branch exists
 - Starting work on main/master without explicit user consent
 - Skipping the baseline test verification
 - Forgetting to report the worktree location
