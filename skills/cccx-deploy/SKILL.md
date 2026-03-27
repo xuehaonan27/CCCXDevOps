@@ -48,8 +48,8 @@ If any prerequisite is missing: STOP. Ask the user to fill in `SERVICE_PROFILE.m
    - For production: require explicit user confirmation ("Deploy to production? [yes/no]")
 
 4. **Generate deployment plan**
-   - If `DEPLOYMENT_PLAN.md` exists, use it
-   - Otherwise, generate one from SERVICE_PROFILE.md using `templates/DEPLOYMENT_PLAN.md`
+   - If `DEPLOYMENT_PLAN.md` exists in the project, use it
+   - Otherwise, generate one covering: overview (service, target, version, date), pre-deployment checklist, deployment steps (from SERVICE_PROFILE.md deploy command), post-deployment validation (from SERVICE_PROFILE.md validation commands), rollback plan (from SERVICE_PROFILE.md rollback command), and monitor window
 
 ### Phase 2: Safety Review
 
@@ -67,6 +67,7 @@ Request Codex review through `cccx-review`:
    - APPROVE: proceed to Phase 3
    - REQUEST_CHANGES: address issues, re-submit
    - BLOCK: STOP. Present to user. Do not proceed.
+   - SKIPPED (Codex not configured): warn user that deploy safety review was not performed. For **production** deployments, STOP and require explicit user acknowledgment before proceeding without review. For non-production, proceed with warning.
 
 ### Phase 3: Execute Deployment
 

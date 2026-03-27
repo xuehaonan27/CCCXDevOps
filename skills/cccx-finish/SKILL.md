@@ -40,8 +40,11 @@ Request final diff review through `cccx-review`:
    - evidence: `git diff $BASE_SHA..HEAD`, test output, commit log
 
 3. Invoke `cccx-review`
-4. Address any issues before presenting options
-5. If BLOCK: present to user, do not offer merge options
+4. Handle the verdict:
+   - APPROVE: proceed to Step 3
+   - REQUEST_CHANGES: address issues, re-submit
+   - BLOCK: present to user, do not offer merge options
+   - SKIPPED (Codex not configured): warn user that external review was not performed, then proceed to Step 3
 
 ### Step 3: Present Options
 

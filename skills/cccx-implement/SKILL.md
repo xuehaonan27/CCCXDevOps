@@ -104,8 +104,11 @@ Request Codex review through `cccx-review`:
    - goal: validate architectural coherence across all tasks
    - evidence: git diff from worktree base to HEAD, full test output
 2. Invoke `cccx-review`
-3. Address any issues
-4. After APPROVE: invoke `cccx-finish`
+3. Handle the verdict:
+   - APPROVE: invoke `cccx-finish`
+   - REQUEST_CHANGES: address issues, re-submit
+   - BLOCK: present to user for decision
+   - SKIPPED (Codex not configured): warn user that external review was not performed, then invoke `cccx-finish`
 
 ## Important Rules
 

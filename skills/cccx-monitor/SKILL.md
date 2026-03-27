@@ -37,13 +37,14 @@ Read `SERVICE_PROFILE.md` and extract:
 For each health endpoint:
 
 ```bash
-bash scripts/health-check.sh <url> \
+# If health-check.sh was installed (via install.sh --with-scripts):
+bash ~/.claude/scripts/health-check.sh <url> \
   --expected-status <code> \
   --expected-body "<substring>" \
   --timeout 10
 ```
 
-Or if `health-check.sh` is not installed, use curl directly:
+If `~/.claude/scripts/health-check.sh` does not exist, use curl directly:
 
 ```bash
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "<url>")

@@ -38,15 +38,19 @@ A framework for Claude Code and Codex to work together on Development, Operation
 
 ```bash
 # Install
-git clone <repo-url> CCCXDevOps
-bash CCCXDevOps/scripts/install.sh --auto-claude-md
+git clone <repo-url> /tmp/CCCXDevOps
+bash /tmp/CCCXDevOps/scripts/install.sh
+
+# Add this to your project's CLAUDE.md:
+#   ## CCCXDevOps
+#   When working in this project, check CCCXDevOps skills before taking action.
+#   Invoke /cccx-using-devops at session start to activate workflow discipline.
 
 # Optional: enable Codex review
 npm install -g @openai/codex && codex setup
 claude mcp add codex -s user -- codex mcp-server
 
-# Use
-# Start Claude Code in your project, then:
+# Use -- start Claude Code in your project, then:
 #   /cccx-using-devops          -- activate workflow discipline
 #   /cccx-dev-pipeline          -- full development workflow
 #   /cccx-brainstorm            -- design exploration only

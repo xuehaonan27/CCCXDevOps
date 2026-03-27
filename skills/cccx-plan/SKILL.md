@@ -100,9 +100,11 @@ Request Codex review through `cccx-review`:
    - goal: validate plan completeness and executability
    - evidence: the full plan + approved design document
 2. Invoke `cccx-review`
-3. If REQUEST_CHANGES: address issues, re-submit
-4. If BLOCK: present to user for decision
-5. If APPROVE: proceed
+3. Handle the verdict:
+   - APPROVE: proceed to Step 7
+   - REQUEST_CHANGES: address issues, re-submit
+   - BLOCK: present to user for decision
+   - SKIPPED (Codex not configured): warn user that external review was not performed, then proceed to Step 7
 
 ### Step 7: Save and Handoff
 

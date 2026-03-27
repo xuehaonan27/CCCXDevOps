@@ -28,14 +28,7 @@ If no REVIEW_REQUEST.md exists but the caller provided context inline, create on
 
 ### Phase 2: Load the Review Profile
 
-Read the matching profile from `shared-references/review-profiles/`:
-
-- `dev-design` -> `review-profiles/dev-design.md`
-- `dev-plan` -> `review-profiles/dev-plan.md`
-- `dev-implementation` -> `review-profiles/dev-implementation.md`
-- `deploy-safety` -> `review-profiles/deploy-safety.md`
-
-The profile defines: review intent, required evidence, review questions, and approval thresholds.
+Use the matching profile from the **Inlined Review Profiles** section below. Do NOT attempt to read external profile files -- the profiles are embedded in this skill.
 
 ### Phase 3: Assemble the Codex Prompt
 
@@ -72,10 +65,10 @@ Respond using this structure:
 - Include what changed since the last review
 
 **If Codex MCP is not available:**
-- Report: "External review skipped: Codex MCP not configured."
+- Write `.cccx/review/REVIEW_RESPONSE.md` with verdict `SKIPPED`
+- Report to calling workflow: "External review skipped: Codex MCP not configured."
 - Do NOT pretend the review happened
 - Do NOT fabricate a review response
-- The calling workflow must note the skip and decide whether to proceed with a warning
 
 ### Phase 5: Parse and Write Response
 
@@ -84,26 +77,26 @@ Respond using this structure:
 
 ```markdown
 ---
-verdict: APPROVE | REQUEST_CHANGES | BLOCK
-risk: LOW | MEDIUM | HIGH | CRITICAL
+verdict: APPROVE | REQUEST_CHANGES | BLOCK | SKIPPED
+risk: LOW | MEDIUM | HIGH | CRITICAL | UNKNOWN
 profile: <profile-name>
 timestamp: <ISO 8601>
 ---
 
 ## Blockers
-<from Codex response>
+<from Codex response, or "N/A" if SKIPPED>
 
 ## Questions
-<from Codex response>
+<from Codex response, or "N/A" if SKIPPED>
 
 ## Required Evidence
-<from Codex response>
+<from Codex response, or "N/A" if SKIPPED>
 
 ## Suggested Next Step
-<from Codex response>
+<from Codex response, or "Proceed without external review" if SKIPPED>
 
 ## Raw Reviewer Notes
-<full Codex response for reference>
+<full Codex response for reference, or "Review was skipped: Codex MCP not configured" if SKIPPED>
 ```
 
 ### Phase 6: Report to Calling Workflow
@@ -111,6 +104,7 @@ timestamp: <ISO 8601>
 - **APPROVE**: Report approval. Calling workflow proceeds.
 - **REQUEST_CHANGES**: Report issues. Calling workflow addresses them, then re-submits (back to Phase 1 with updated request).
 - **BLOCK**: Report blockers. STOP. Present to user. Do not auto-proceed.
+- **SKIPPED**: Report that external review was not performed. Calling workflow proceeds with a visible warning to the user.
 
 ### Retry Policy
 
@@ -118,6 +112,82 @@ timestamp: <ISO 8601>
 - If still REQUEST_CHANGES after 3 rounds: escalate to human
 - If BLOCK at any round: immediate human escalation
 - Each round uses `mcp__codex__codex-reply` to maintain thread context
+
+---
+
+## Inlined Review Profiles
+
+### Profile: dev-design
+
+**Intent:** Evaluate a design document for completeness, clarity, and risk before implementation planning.
+
+**Required evidence:** Design document (full text), feature brief or user request, relevant project context.
+
+**Review questions:**
+1. Does the design address all stated requirements?
+2. Are there vague or underspecified sections?
+3. What risks or failure modes are unaddressed?
+4. Is the scope appropriate?
+5. Can the design be verified with automated tests?
+6. Were trade-offs between approaches considered?
+
+**Thresholds:** APPROVE if clear, complete, reasonable risk handling. REQUEST_CHANGES if gaps/ambiguity would cause planning problems. BLOCK if fundamentally flawed.
+
+### Profile: dev-plan
+
+**Intent:** Evaluate an implementation plan for completeness, task granularity, and executability.
+
+**Required evidence:** Implementation plan (full text), approved design document, project structure listing.
+
+**Review questions:**
+1. Are all tasks at 2-5 minute granularity?
+2. Does every design requirement have a corresponding task?
+3. Are there placeholders (TBD, TODO, "similar to Task N")?
+4. Do all file paths exist or are clearly new?
+5. Does every feature task have a test task?
+6. Can tasks be executed in stated order?
+7. Are commands complete and runnable?
+8. Are edge cases covered?
+
+**Thresholds:** APPROVE if executable as-is. REQUEST_CHANGES if gaps or ambiguous steps. BLOCK if misaligned with design.
+
+### Profile: dev-implementation
+
+**Intent:** Evaluate a completed implementation for code quality, test coverage, spec compliance, and coherence.
+
+**Required evidence:** Git diff, test output (full suite), implementation plan, commit log.
+
+**Review questions:**
+1. Does implementation match the plan? Nothing extra, nothing missing?
+2. Does every function have a test? Written test-first?
+3. Are files focused (single responsibility)? Interfaces clean?
+4. Does code follow existing codebase conventions?
+5. Are errors handled at boundaries?
+6. Any speculative code not in the plan?
+7. Architectural coherence? Circular dependencies?
+8. Any security vulnerabilities?
+
+**Thresholds:** APPROVE if clean, tested, matches spec. REQUEST_CHANGES if quality issues or missing tests. BLOCK if architectural problems or security vulnerabilities.
+
+### Profile: deploy-safety
+
+**Intent:** Evaluate a deployment plan for safety, rollback coverage, and blast radius.
+
+**Required evidence:** SERVICE_PROFILE.md, deployment plan, test results, current service health.
+
+**Review questions:**
+1. Is rollback documented and verified?
+2. Which users/services are affected? Scope contained?
+3. Are post-deployment validation commands defined?
+4. Is there a monitoring period with escalation path?
+5. Do all pre-flight checks pass?
+6. For production: staged/canary approach or justified all-at-once?
+7. New secrets handled safely?
+8. Depends on other service updates?
+
+**Thresholds:** APPROVE if safe, rollback documented, validation defined. REQUEST_CHANGES if missing rollback or unclear blast radius. BLOCK if no rollback, untested code, or production without confirmation. Auto-BLOCK if SERVICE_PROFILE.md is missing.
+
+---
 
 ## Red Flags
 

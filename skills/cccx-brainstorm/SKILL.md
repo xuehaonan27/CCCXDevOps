@@ -25,9 +25,8 @@ Anti-pattern: "This is too simple to need design." Every project benefits from e
 ### Phase 1: Explore Context
 
 1. Read relevant project files, docs, recent commits
-2. Check for a `FEATURE_BRIEF.md` in the project root or `templates/FEATURE_BRIEF.md`
-3. If a brief exists, use it as primary context
-4. Understand existing patterns and conventions in the codebase
+2. Check for a `FEATURE_BRIEF.md` in the project root. If it exists, use it as primary context. If not, gather requirements from the user's request.
+3. Understand existing patterns and conventions in the codebase
 
 ### Phase 2: Clarify Requirements
 
@@ -89,9 +88,11 @@ Request Codex review through `cccx-review`:
    - goal: validate design completeness and identify risks
    - evidence: the full design document + feature brief
 2. Invoke `cccx-review`
-3. If REQUEST_CHANGES: address issues, re-submit
-4. If BLOCK: present to user for decision
-5. If APPROVE: proceed
+3. Handle the verdict:
+   - APPROVE: proceed to Phase 7
+   - REQUEST_CHANGES: address issues, re-submit
+   - BLOCK: present to user for decision
+   - SKIPPED (Codex not configured): warn user that external review was not performed, then proceed to Phase 7
 
 ### Phase 7: User Approval
 
