@@ -77,7 +77,7 @@ Request Codex review through `cccx-review`:
 
 2. **Immediate health check**
    - Hit health endpoints defined in SERVICE_PROFILE.md
-   - Use `scripts/health-check.sh` if available
+   - Use `~/.claude/scripts/health-check.sh` if installed, otherwise curl directly
    - Report status
 
 3. **Run validation commands**

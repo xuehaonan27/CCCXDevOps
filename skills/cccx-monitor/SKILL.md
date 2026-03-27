@@ -50,6 +50,10 @@ If `~/.claude/scripts/health-check.sh` does not exist, use curl directly:
 ```bash
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X <METHOD> --max-time 10 "<url>")
 echo "Health: <METHOD> <url> returned $STATUS (expected <code>)"
+
+# Body check (if expected body is defined in SERVICE_PROFILE.md):
+BODY=$(curl -s -X <METHOD> --max-time 10 "<url>")
+echo "$BODY" | grep -qF "<expected-body>" && echo "Body: PASS" || echo "Body: FAIL"
 ```
 
 ### Step 3: Run Validation Commands
